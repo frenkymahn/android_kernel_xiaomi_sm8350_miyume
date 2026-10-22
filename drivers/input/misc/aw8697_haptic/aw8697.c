@@ -35,6 +35,8 @@
 #include "aw8697_reg.h"
 #include "aw8697.h"
 #include  "ringbuffer.h"
+#include <linux/vmalloc.h>
+#include <linux/pinctrl/consumer.h>
 
 
 /******************************************************
