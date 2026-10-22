@@ -3,14 +3,14 @@
 # 例如: bash build_device.sh venus
 # 不带参数默认 venus
 
-device=${1:-venus}
+device=${1:-vili}
 workdir=$(cd "$(dirname "$0")"; pwd)
 cd "$workdir"
 
 echo "构建设备: $device"
 
 # 配置内核
-make -j$(nproc --all) ARCH=arm64 LLVM=1 LLVM_IAS=1 O=out_${device} ${device}_defconfig
+make -j$(nproc --all) ARCH=arm64 LLVM=1 LLVM_IAS=1 O=out_${device} vendor/${device}_defconfig
 
 # 编译内核
 make -j$(nproc --all) ARCH=arm64 LLVM=1 LLVM_IAS=1 O=out_${device} modules Image
