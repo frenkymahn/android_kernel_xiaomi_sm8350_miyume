@@ -27,7 +27,10 @@ jobs:
       - name: Set up Build Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential bc bison flex libssl-dev libelf-dev clang lld llvm zip git curl
+          sudo apt-get install -y build-essential bc bison flex libssl-dev libelf-dev clang lld llvm zip git curl libncurses6 libtinfo6
+          # Fix missing libtinfo.so.5 and libncurses.so.5 for prebuilt Clang
+          sudo ln -sf /usr/lib/x86_64-linux-gnu/libtinfo.so.6 /usr/lib/x86_64-linux-gnu/libtinfo.so.5
+          sudo ln -sf /usr/lib/x86_64-linux-gnu/libncurses.so.6 /usr/lib/x86_64-linux-gnu/libncurses.so.5
 
       - name: Download Clang 18 Toolchain
         run: |
@@ -66,7 +69,7 @@ jobs:
           device.name2=vili_in
           device.name3=vili_global
           device.name4=haydn
-          device.name5=venus
+          device.name5=vili
           supported.versions=11-17
           '; }
 
