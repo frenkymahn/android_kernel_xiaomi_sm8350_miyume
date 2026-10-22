@@ -1,0 +1,92 @@
+name: Build MiYume Vili Kernel
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Kernel for Xiaomi 11T Pro (vili)
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Maximize build space
+        uses: easimon/maximize-build-space@master
+        with:
+          root-reserve-mb: 8192
+          temp-reserve-mb: 2048
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+          remove-docker-images: 'true'
+
+      - name: Checkout Source
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Set up Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential bc bison flex libssl-dev libelf-dev clang lld llvm zip git curl
+
+      - name: Download Clang 18 Toolchain
+        run: |
+          mkdir -p toolchain/clang
+          cd toolchain/clang
+          curl -LO "https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04.tar.xz"
+          tar -xf clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04.tar.xz --strip-components=1
+          cd ../..
+
+      - name: Configure Kernel with vili_defconfig
+        run: |
+          export PATH=$(pwd)/toolchain/clang/bin:$PATH
+          make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 vili_defconfig
+          make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig
+
+      - name: Compile Kernel Image
+        run: |
+          export PATH=$(pwd)/toolchain/clang/bin:$PATH
+          make -j$(nproc --all) O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 Image modules
+
+      - name: Package with AnyKernel3
+        run: |
+          git clone https://github.com/osm0sis/AnyKernel3.git
+          cd AnyKernel3
+          rm -rf anykernel.sh
+
+          cat << 'EOF' > anykernel.sh
+          properties() { '
+          kernel.string=MiYume HoshinoNeko Kernel for Xiaomi 11T Pro (vili)
+          do.devicecheck=1
+          do.modules=0
+          do.systemless=1
+          do.cleanup=1
+          do.cleanuponabort=0
+          device.name1=vili
+          device.name2=vili_in
+          device.name3=vili_global
+          device.name4=haydn
+          device.name5=venus
+          supported.versions=11-17
+          '; }
+
+          BLOCK=auto;
+          IS_SLOT_DEVICE=auto;
+          RAMDISK_COMPRESSION=auto;
+          PATCH_VBMETA_FLAG=auto;
+
+          . tools/ak3-core.sh;
+          reset_ak;
+
+          split_boot;
+          flash_boot;
+          EOF
+
+          cp ../out/arch/arm64/boot/Image Image
+          zip -r9 ../Vili_MiYume_Kernel.zip * -x .git README.md *placeholder
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Vili-MiYume-Kernel-Flashable
+          path: Vili_MiYume_Kernel.zip
