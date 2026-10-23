@@ -27,25 +27,42 @@ jobs:
       - name: Set up Build Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential bc bison flex libssl-dev libelf-dev zip git curl libncurses5 libtinfo5
+          sudo apt-get install -y build-essential bc bison flex libssl-dev libelf-dev zip git curl libncurses5 libtinfo5 gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi
 
-      - name: Download Proton Clang Toolchain
+      - name: Download Google Android Clang (r416183b)
         run: |
-          git clone --depth=1 https://github.com/kdrag0n/proton-clang.git toolchain/clang
+          mkdir -p toolchain/clang
+          cd toolchain/clang
+          curl -LO https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android12-release/clang-r416183b.tar.gz
+          tar -xf clang-r416183b.tar.gz
+          cd ../..
 
       - name: Configure Kernel with vili_defconfig
         run: |
           export PATH=$(pwd)/toolchain/clang/bin:$PATH
-          make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 vili_defconfig
-          make O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig
+          make O=out ARCH=arm64 \
+            CC=clang \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+            LLVM=1 LLVM_IAS=1 vili_defconfig
+          make O=out ARCH=arm64 \
+            CC=clang \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+            LLVM=1 LLVM_IAS=1 olddefconfig
 
       - name: Compile Kernel Image
         run: |
           export PATH=$(pwd)/toolchain/clang/bin:$PATH
-          make -j$(nproc --all) O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 \
-            KBUILD_CFLAGS="-w" \
+          make -j$(nproc --all) O=out ARCH=arm64 \
+            CC=clang \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+            LLVM=1 LLVM_IAS=1 \
             KCFLAGS="-w" \
-            KCPPFLAGS="-w" \
             Image modules
 
       - name: Package with AnyKernel3
@@ -56,7 +73,7 @@ jobs:
 
           cat << 'EOF' > anykernel.sh
           properties() { '
-          kernel.string=MiYume HoshinoNeko Kernel for Xiaomi 11T Pro (vili)
+          kernel.string=MiYume HoshinoNeko Kernel (ReSukiSU + SuSFS) for Xiaomi 11T Pro
           do.devicecheck=1
           do.modules=0
           do.systemless=1
