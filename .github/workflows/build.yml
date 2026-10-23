@@ -33,12 +33,6 @@ jobs:
         run: |
           git clone --depth=1 https://github.com/kdrag0n/proton-clang.git toolchain/clang
 
-      - name: Disable -Werror Globally in Kernel Makefiles
-        run: |
-          # Remove -Werror flags from root Makefile and scripts
-          find . -name "Makefile*" -o -name "Kbuild*" | xargs sed -i 's/-Werror//g' || true
-          sed -i 's/-Werror//g' Makefile || true
-
       - name: Configure Kernel with vili_defconfig
         run: |
           export PATH=$(pwd)/toolchain/clang/bin:$PATH
@@ -49,9 +43,9 @@ jobs:
         run: |
           export PATH=$(pwd)/toolchain/clang/bin:$PATH
           make -j$(nproc --all) O=out ARCH=arm64 LLVM=1 LLVM_IAS=1 \
-            KCFLAGS="-Wno-error -w" \
-            KCPPFLAGS="-Wno-error -w" \
-            CFLAGS_MODULE="-Wno-error -w" \
+            KBUILD_CFLAGS="-w" \
+            KCFLAGS="-w" \
+            KCPPFLAGS="-w" \
             Image modules
 
       - name: Package with AnyKernel3
