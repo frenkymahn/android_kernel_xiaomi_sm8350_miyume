@@ -21,11 +21,8 @@ jobs:
 
       - name: Download Clang Toolchain
         run: |
-          mkdir -p toolchain/clang
-          # Google Clang r450784d (Android Clang 14.0.7 for SM8350)
-          curl -LO https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android14-release/clang-r450784d.tar.gz
-          tar -C toolchain/clang/ -zxf clang-r450784d.tar.gz
-          rm -f clang-r450784d.tar.gz
+          mkdir -p toolchain
+          git clone https://gitlab.com/crdroidandroid/android_prebuilts_clang_host_linux-x86_clang-r450784d.git -b 12.0 --depth=1 toolchain/clang
 
       - name: Compile Kernel Image & DTB
         run: |
