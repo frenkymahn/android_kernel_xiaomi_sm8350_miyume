@@ -22,7 +22,7 @@ jobs:
       - name: Download Clang Toolchain
         run: |
           mkdir -p toolchain
-          git clone https://gitlab.com/crdroidandroid/android_prebuilts_clang_host_linux-x86_clang-r450784d.git -b 12.0 --depth=1 toolchain/clang
+          git clone --depth=1 https://github.com/LineageOS/android_prebuilts_clang_kernel_linux-x86_clang-r416183b.git toolchain/clang
 
       - name: Compile Kernel Image & DTB
         run: |
