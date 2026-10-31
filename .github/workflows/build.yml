@@ -17,7 +17,7 @@ jobs:
       - name: Setup Build Environment
         run: |
           sudo apt-get update
-          sudo apt-get install -y git ccache automake flex lzop bison gperf build-essential zip curl zlib1g-dev g++-multilib libxml2-utils bzip2 libbz2-dev libbz2-1.0 libghc-bzlib-dev squashfs-tools pngcrush schedtool dpkg-dev liblz4-tool make optipng bc libssl-dev libelf-dev libfl-dev python3 python2 device-tree-compiler
+          sudo apt-get install -y git ccache automake flex lzop bison gperf build-essential zip curl zlib1g-dev g++-multilib libxml2-utils bzip2 libbz2-dev libbz2-1.0 libghc-bzlib-dev squashfs-tools pngcrush schedtool dpkg-dev lz4 make optipng bc libssl-dev libelf-dev libfl-dev python3 python-is-python3 device-tree-compiler
 
       - name: Download Clang Toolchain
         run: |
@@ -35,7 +35,6 @@ jobs:
           export KBUILD_BUILD_USER="frenkymahn"
           export KBUILD_BUILD_HOST="GitHub-Actions"
 
-          # Compiler Flags
           MAKE_PARAMS=(
             ARCH=arm64
             CC=clang
@@ -50,10 +49,7 @@ jobs:
             CLANG_TRIPLE=aarch64-linux-gnu-
           )
 
-          # Generate Configuration
           make O=out "${MAKE_PARAMS[@]}" vili_defconfig
-
-          # Compile Image, dtbs and dtbo
           make -j$(nproc --all) O=out "${MAKE_PARAMS[@]}" Image dtbs dtbo.img
 
       - name: Package with AnyKernel3
@@ -63,16 +59,15 @@ jobs:
           # Copy Kernel Image
           cp out/arch/arm64/boot/Image anykernel/
 
-          # Copy DTB / DTBO if generated
+          # Copy DTBO if generated
           if [ -f out/arch/arm64/boot/dtbo.img ]; then
             cp out/arch/arm64/boot/dtbo.img anykernel/
           fi
 
-          # Find and concatenate target DTB
+          # Merge/copy target DTB
           find out/arch/arm64/boot/dts/vendor/qcom -name "*lahaina*.dtb" -exec cat {} + > anykernel/dtb 2>/dev/null || true
 
           cd anykernel
-          # Disable default device check for broad custom ROM/recovery compatibility
           sed -i 's/device.name1=.*/device.name1=vili/g' anykernel.sh
           sed -i 's/device.name2=.*/device.name2=viliin/g' anykernel.sh
 
