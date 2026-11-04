@@ -47,20 +47,28 @@ jobs:
           )
 
           make O=out "${MAKE_PARAMS[@]}" vili_defconfig
+
+          # Auto-fix touchscreen linker errors via YAML
+          sed -i 's/CONFIG_TOUCHSCREEN_ST_FTS_V521_SPI=y/# CONFIG_TOUCHSCREEN_ST_FTS_V521_SPI is not set/' out/.config
+          sed -i 's/CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5=y/# CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5 is not set/' out/.config
+          sed -i 's/CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_I2C=y/# CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_I2C is not set/' out/.config
+          sed -i 's/CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_DEVICE_ACCESS=y/# CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_DEVICE_ACCESS is not set/' out/.config
+          sed -i 's/CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_LOADER=y/# CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_LOADER is not set/' out/.config
+
           make -j$(nproc --all) O=out "${MAKE_PARAMS[@]}" Image
 
       - name: Package with AnyKernel3
         run: |
           git clone https://github.com/osm0sis/AnyKernel3.git --depth=1 anykernel
 
-          # Copy Kernel Image only (Exact Venus method)
+          # Copy Kernel Image only (Venus layout, no external dtb)
           cp out/arch/arm64/boot/Image anykernel/
 
           # Copy optional payloads if present in repo root
           [ -f phantom-package.json ] && cp phantom-package.json anykernel/
           [ -d patch ] && cp -r patch anykernel/
 
-          # Adapt anykernel.sh cleanly for Vili
+          # Adapt anykernel.sh for Vili
           sed -i 's/kernel.string=.*/kernel.string=Next-Gen Kernel For Xiaomi 11T Pro (vili)/g' anykernel/anykernel.sh
           sed -i 's/do.devicecheck=1/do.devicecheck=0/g' anykernel/anykernel.sh
           sed -i 's/device.name1=.*/device.name1=vili/g' anykernel/anykernel.sh
