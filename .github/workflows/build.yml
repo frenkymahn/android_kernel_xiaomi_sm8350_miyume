@@ -24,7 +24,7 @@ jobs:
           mkdir -p toolchain
           git clone --depth=1 https://github.com/LineageOS/android_prebuilts_clang_kernel_linux-x86_clang-r416183b.git toolchain/clang
 
-      - name: Compile Kernel Image & DTBs
+      - name: Compile Kernel Image Only
         run: |
           export PATH="${GITHUB_WORKSPACE}/toolchain/clang/bin:$PATH"
           export ARCH=arm64
@@ -47,20 +47,20 @@ jobs:
           )
 
           make O=out "${MAKE_PARAMS[@]}" vili_defconfig
-          make -j$(nproc --all) O=out "${MAKE_PARAMS[@]}" Image dtbs
+          make -j$(nproc --all) O=out "${MAKE_PARAMS[@]}" Image
 
       - name: Package with AnyKernel3
         run: |
           git clone https://github.com/osm0sis/AnyKernel3.git --depth=1 anykernel
 
-          # Copy Kernel Image only (Venus layout, no external dtb)
+          # Copy Kernel Image only (Exact Venus method)
           cp out/arch/arm64/boot/Image anykernel/
 
           # Copy optional payloads if present in repo root
           [ -f phantom-package.json ] && cp phantom-package.json anykernel/
           [ -d patch ] && cp -r patch anykernel/
 
-          # Adapt anykernel.sh for Vili
+          # Adapt anykernel.sh cleanly for Vili
           sed -i 's/kernel.string=.*/kernel.string=Next-Gen Kernel For Xiaomi 11T Pro (vili)/g' anykernel/anykernel.sh
           sed -i 's/do.devicecheck=1/do.devicecheck=0/g' anykernel/anykernel.sh
           sed -i 's/device.name1=.*/device.name1=vili/g' anykernel/anykernel.sh
