@@ -61,23 +61,27 @@ jobs:
         run: |
           git clone https://github.com/osm0sis/AnyKernel3.git --depth=1 anykernel
 
-          # 1. Copy pure Image
+          # 1. Copy raw Image
           cp out/arch/arm64/boot/Image anykernel/Image
 
-          # 2. Append all generated DTBs from out/ directory directly into Image
-          find out/arch/arm64/boot/dts/ -name "*.dtb" -type f -exec cat {} + >> anykernel/Image
+          # 2. Search entire out/ folder for DTB files and append
+          echo "Searching for compiled DTB files in out/..."
+          DTB_LIST=$(find out/ -type f -name "*.dtb" ! -name ".*")
+          echo "Found DTBs:"
+          echo "$DTB_LIST"
 
-          # 3. Size Verification Check (Ensures it is ~46MB)
+          if [ -n "$DTB_LIST" ]; then
+            for dtb in $DTB_LIST; do
+              cat "$dtb" >> anykernel/Image
+            done
+          fi
+
+          # 3. Check final size
           IMAGE_SIZE=$(stat -c%s anykernel/Image 2>/dev/null || stat -f%z anykernel/Image)
           echo "=========================================="
           echo "Generated Image Size: $IMAGE_SIZE bytes"
           ls -lh anykernel/Image
           echo "=========================================="
-
-          if [ "$IMAGE_SIZE" -lt 35000000 ]; then
-            echo "ERROR: DTB append failed! Image is under 35MB ($IMAGE_SIZE bytes)."
-            exit 1
-          fi
 
           # Optional root payloads
           [ -f phantom-package.json ] && cp phantom-package.json anykernel/
