@@ -24,7 +24,7 @@ jobs:
           mkdir -p toolchain
           git clone --depth=1 https://github.com/LineageOS/android_prebuilts_clang_kernel_linux-x86_clang-r416183b.git toolchain/clang
 
-      - name: Compile Kernel Image Only
+      - name: Compile Kernel Image & DTBs
         run: |
           export PATH="${GITHUB_WORKSPACE}/toolchain/clang/bin:$PATH"
           export ARCH=arm64
@@ -48,27 +48,33 @@ jobs:
 
           make O=out "${MAKE_PARAMS[@]}" vili_defconfig
 
-          # Auto-fix touchscreen linker errors via YAML
+          # Touchscreen driver linker fixes
           sed -i 's/CONFIG_TOUCHSCREEN_ST_FTS_V521_SPI=y/# CONFIG_TOUCHSCREEN_ST_FTS_V521_SPI is not set/' out/.config
           sed -i 's/CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5=y/# CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5 is not set/' out/.config
           sed -i 's/CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_I2C=y/# CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_I2C is not set/' out/.config
           sed -i 's/CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_DEVICE_ACCESS=y/# CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_DEVICE_ACCESS is not set/' out/.config
           sed -i 's/CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_LOADER=y/# CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_LOADER is not set/' out/.config
 
-          make -j$(nproc --all) O=out "${MAKE_PARAMS[@]}" Image
+          make -j$(nproc --all) O=out "${MAKE_PARAMS[@]}" Image dtbs
 
-      - name: Package with AnyKernel3
+      - name: Package with AnyKernel3 (Venus Style - 46MB Image)
         run: |
           git clone https://github.com/osm0sis/AnyKernel3.git --depth=1 anykernel
 
-          # Copy Kernel Image only (Venus layout, no external dtb)
-          cp out/arch/arm64/boot/Image anykernel/
+          # Combine Image + DTBs into single 46MB Image (Exact Venus method)
+          if [ -d out/arch/arm64/boot/dts/vendor/qcom ]; then
+            cat out/arch/arm64/boot/Image out/arch/arm64/boot/dts/vendor/qcom/*.dtb > anykernel/Image
+          elif [ -d out/arch/arm64/boot/dts/qcom ]; then
+            cat out/arch/arm64/boot/Image out/arch/arm64/boot/dts/qcom/*.dtb > anykernel/Image
+          else
+            find out/arch/arm64/boot/dts -name "*.dtb" -exec cat out/arch/arm64/boot/Image {} + > anykernel/Image
+          fi
 
-          # Copy optional payloads if present in repo root
+          # Optional root payloads
           [ -f phantom-package.json ] && cp phantom-package.json anykernel/
           [ -d patch ] && cp -r patch anykernel/
 
-          # Adapt anykernel.sh for Vili
+          # Adapt anykernel.sh for vili
           sed -i 's/kernel.string=.*/kernel.string=Next-Gen Kernel For Xiaomi 11T Pro (vili)/g' anykernel/anykernel.sh
           sed -i 's/do.devicecheck=1/do.devicecheck=0/g' anykernel/anykernel.sh
           sed -i 's/device.name1=.*/device.name1=vili/g' anykernel/anykernel.sh
@@ -78,6 +84,7 @@ jobs:
           sed -i 's/is_slot_device=0/is_slot_device=auto/g' anykernel/anykernel.sh
 
           cd anykernel
+          ls -lh Image
           ZIP_NAME="Next-Gen-vili-$(date +'%Y%m%d_%H%M%S').zip"
           zip -r9 "../$ZIP_NAME" * -x .git README.md *placeholder
           echo "ZIP_PATH=$ZIP_NAME" >> $GITHUB_ENV
