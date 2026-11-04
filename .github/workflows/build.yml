@@ -17,7 +17,7 @@ jobs:
       - name: Setup Build Environment
         run: |
           sudo apt-get update
-          sudo apt-get install -y git ccache automake flex lzop bison gperf build-essential zip curl zlib1g-dev g++-multilib libxml2-utils bzip2 libbz2-dev libbz2-1.0 libghc-bzlib-dev squashfs-tools pngcrush schedtool dpkg-dev lz4 make optipng bc libssl-dev libelf-dev libfl-dev python3 python-is-python3 device-tree-compiler
+          sudo apt-get install -y git ccache automake flex lzop bison gperf build-essential zip curl zlib1g-dev g++-multilib libxml2-utils bzip2 libbz2-dev libbz2-1.0 libghc-bzlib-dev squashfs-tools pngcrush schedtool dpkg-dev lz4 make optipng bc libssl-dev libelf-dev libfl-dev python3 python-is-python3 device-tree-compiler wget
 
       - name: Download Clang Toolchain
         run: |
@@ -48,7 +48,7 @@ jobs:
 
           make O=out "${MAKE_PARAMS[@]}" vili_defconfig
 
-          # Touchscreen driver linker fixes
+          # Fix touchscreen driver linker errors
           sed -i 's/CONFIG_TOUCHSCREEN_ST_FTS_V521_SPI=y/# CONFIG_TOUCHSCREEN_ST_FTS_V521_SPI is not set/' out/.config
           sed -i 's/CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5=y/# CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5 is not set/' out/.config
           sed -i 's/CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_I2C=y/# CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_I2C is not set/' out/.config
@@ -57,37 +57,37 @@ jobs:
 
           make -j$(nproc --all) O=out "${MAKE_PARAMS[@]}" Image dtbs
 
-      - name: Package with AnyKernel3 (Venus Style - 46MB Appended Image)
+      - name: Package with AnyKernel3 (Exact Venus Layout)
         run: |
           git clone https://github.com/osm0sis/AnyKernel3.git --depth=1 anykernel
 
-          # 1. Copy raw Image
+          # 1. Base Kernel Image
           cp out/arch/arm64/boot/Image anykernel/Image
 
-          # 2. Search entire out/ folder for DTB files and append
-          echo "Searching for compiled DTB files in out/..."
-          DTB_LIST=$(find out/ -type f -name "*.dtb" ! -name ".*")
-          echo "Found DTBs:"
-          echo "$DTB_LIST"
+          # 2. Append all Lahaina compiled DTBs to make 46MB single Image
+          find out/ -name "*.dtb" -exec cat {} + >> anykernel/Image
 
-          if [ -n "$DTB_LIST" ]; then
-            for dtb in $DTB_LIST; do
-              cat "$dtb" >> anykernel/Image
-            done
-          fi
+          # 3. Create phantom-package.json exactly as in Venus
+          cat << 'EOF' > anykernel/phantom-package.json
+          {
+            "package_name": "Next-Gen Kernel",
+            "device": "vili",
+            "version": "1.0",
+            "author": "frenkymahn",
+            "features": [
+              "KernelSU",
+              "BBR2",
+              "eBPF"
+            ]
+          }
+          EOF
+          sed -i 's/^          //' anykernel/phantom-package.json
 
-          # 3. Check final size
-          IMAGE_SIZE=$(stat -c%s anykernel/Image 2>/dev/null || stat -f%z anykernel/Image)
-          echo "=========================================="
-          echo "Generated Image Size: $IMAGE_SIZE bytes"
-          ls -lh anykernel/Image
-          echo "=========================================="
+          # 4. Create patch folder with magisk stub if needed
+          mkdir -p anykernel/patch
+          touch anykernel/patch/.placeholder
 
-          # Optional root payloads
-          [ -f phantom-package.json ] && cp phantom-package.json anykernel/
-          [ -d patch ] && cp -r patch anykernel/
-
-          # Setup anykernel.sh for vili
+          # 5. Adapt anykernel.sh for vili
           sed -i 's/kernel.string=.*/kernel.string=Next-Gen Kernel For Xiaomi 11T Pro (vili)/g' anykernel/anykernel.sh
           sed -i 's/do.devicecheck=1/do.devicecheck=0/g' anykernel/anykernel.sh
           sed -i 's/device.name1=.*/device.name1=vili/g' anykernel/anykernel.sh
@@ -97,6 +97,8 @@ jobs:
           sed -i 's/is_slot_device=0/is_slot_device=auto/g' anykernel/anykernel.sh
 
           cd anykernel
+          echo "Checking generated contents:"
+          ls -lh
           ZIP_NAME="Next-Gen-vili-$(date +'%Y%m%d_%H%M%S').zip"
           zip -r9 "../$ZIP_NAME" * -x .git README.md *placeholder
           echo "ZIP_PATH=$ZIP_NAME" >> $GITHUB_ENV
