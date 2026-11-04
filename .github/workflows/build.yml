@@ -61,14 +61,9 @@ jobs:
         run: |
           git clone https://github.com/osm0sis/AnyKernel3.git --depth=1 anykernel
 
-          # Combine Image + DTBs into single 46MB Image (Exact Venus method)
-          if [ -d out/arch/arm64/boot/dts/vendor/qcom ]; then
-            cat out/arch/arm64/boot/Image out/arch/arm64/boot/dts/vendor/qcom/*.dtb > anykernel/Image
-          elif [ -d out/arch/arm64/boot/dts/qcom ]; then
-            cat out/arch/arm64/boot/Image out/arch/arm64/boot/dts/qcom/*.dtb > anykernel/Image
-          else
-            find out/arch/arm64/boot/dts -name "*.dtb" -exec cat out/arch/arm64/boot/Image {} + > anykernel/Image
-          fi
+          # Find and append all compiled DTBs safely to create full 46MB Image
+          cp out/arch/arm64/boot/Image anykernel/Image
+          find out/arch/arm64/boot/dts -name "*.dtb" -exec cat {} + >> anykernel/Image
 
           # Optional root payloads
           [ -f phantom-package.json ] && cp phantom-package.json anykernel/
@@ -84,6 +79,7 @@ jobs:
           sed -i 's/is_slot_device=0/is_slot_device=auto/g' anykernel/anykernel.sh
 
           cd anykernel
+          echo "Final Image Size:"
           ls -lh Image
           ZIP_NAME="Next-Gen-vili-$(date +'%Y%m%d_%H%M%S').zip"
           zip -r9 "../$ZIP_NAME" * -x .git README.md *placeholder
