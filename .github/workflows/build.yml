@@ -22,7 +22,7 @@ jobs:
       - name: Download Clang Toolchain
         run: |
           mkdir -p toolchain
-          git clone --depth=1 https://github.com/LineageOS/android_prebuilts_clang_kernel_linux-x86_clang-r416183b.git toolchain/clang
+          git clone --depth=1 url?id=0LineageOS/android_prebuilts_clang_kernel_linux-x86_clang-r416183b.git toolchain/clang
 
       - name: Compile Kernel Image & DTBs
         run: |
@@ -57,19 +57,33 @@ jobs:
 
           make -j$(nproc --all) O=out "${MAKE_PARAMS[@]}" Image dtbs
 
-      - name: Package with AnyKernel3 (Venus Style - 46MB Image)
+      - name: Package with AnyKernel3 (Venus Style - 46MB Appended Image)
         run: |
           git clone https://github.com/osm0sis/AnyKernel3.git --depth=1 anykernel
 
-          # Find and append all compiled DTBs safely to create full 46MB Image
+          # 1. First copy pure Image
           cp out/arch/arm64/boot/Image anykernel/Image
-          find out/arch/arm64/boot/dts -name "*.dtb" -exec cat {} + >> anykernel/Image
+
+          # 2. Append all generated DTBs from out/ directory directly into Image
+          find out/arch/arm64/boot/dts/ -name "*.dtb" -type f -exec cat {} + >> anykernel/Image
+
+          # 3. Size Verification Check (Ensures it is ~46MB)
+          IMAGE_SIZE=$(stat -c%s anykernel/Image 2>/dev/null || stat -f%z anykernel/Image)
+          echo "=========================================="
+          echo "Generated Image Size: $IMAGE_SIZE bytes"
+          ls -lh anykernel/Image
+          echo "=========================================="
+
+          if [ "$IMAGE_SIZE" -lt 35000000 ]; then
+            echo "ERROR: DTB append failed! Image is under 35MB ($IMAGE_SIZE bytes)."
+            exit 1
+          fi
 
           # Optional root payloads
           [ -f phantom-package.json ] && cp phantom-package.json anykernel/
           [ -d patch ] && cp -r patch anykernel/
 
-          # Adapt anykernel.sh for vili
+          # Setup anykernel.sh for vili
           sed -i 's/kernel.string=.*/kernel.string=Next-Gen Kernel For Xiaomi 11T Pro (vili)/g' anykernel/anykernel.sh
           sed -i 's/do.devicecheck=1/do.devicecheck=0/g' anykernel/anykernel.sh
           sed -i 's/device.name1=.*/device.name1=vili/g' anykernel/anykernel.sh
@@ -79,8 +93,6 @@ jobs:
           sed -i 's/is_slot_device=0/is_slot_device=auto/g' anykernel/anykernel.sh
 
           cd anykernel
-          echo "Final Image Size:"
-          ls -lh Image
           ZIP_NAME="Next-Gen-vili-$(date +'%Y%m%d_%H%M%S').zip"
           zip -r9 "../$ZIP_NAME" * -x .git README.md *placeholder
           echo "ZIP_PATH=$ZIP_NAME" >> $GITHUB_ENV
