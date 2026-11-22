@@ -46,6 +46,9 @@ jobs:
           # Merge your custom vili_defconfig (Touch, Audio, BPF, KSU)
           chmod +x scripts/kconfig/merge_config.sh
           ./scripts/kconfig/merge_config.sh -m -O out out/.config arch/arm64/configs/vili_defconfig
+
+          # Disable mainline DRM_MSM to prevent duplicate symbol collision with techpack/display
+          ./scripts/config --file out/.config -d DRM_MSM
           make O=out ARCH=arm64 olddefconfig
 
       - name: Compile Kernel
