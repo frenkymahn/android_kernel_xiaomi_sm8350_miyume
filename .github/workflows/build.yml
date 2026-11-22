@@ -34,6 +34,12 @@ jobs:
           submodules: recursive
           fetch-depth: 1
 
+      - name: Checkout AnyKernel3
+        uses: actions/checkout@v4
+        with:
+          repository: osm0sis/AnyKernel3
+          path: AnyKernel3
+
       - name: Configure & Merge Vili Defconfig
         run: |
           export ARCH=arm64
@@ -67,7 +73,6 @@ jobs:
 
       - name: Package with AnyKernel3
         run: |
-          git clone --depth=1 https://github.com AnyKernel3
           cp out/arch/arm64/boot/Image AnyKernel3/Image
           cd AnyKernel3
           sed -i 's/device.name1=.*/device.name1=vili/' anykernel.sh
