@@ -1,4 +1,4 @@
-name: Build Clean Vili HyperOS QGKI Kernel (-NEXTGEN)
+name: Build Vili -NEXTGEN Kernel
 
 on:
   workflow_dispatch:
@@ -34,7 +34,7 @@ jobs:
           submodules: recursive
           fetch-depth: 1
 
-      - name: Update ReSukiSU Driver (Matches Manager v4.2.0)
+      - name: Update ReSukiSU Driver
         run: |
           git submodule update --remote --merge KernelSU || true
 
@@ -44,39 +44,19 @@ jobs:
           repository: osm0sis/AnyKernel3
           path: AnyKernel3
 
-      - name: Configure & Compile Direct Vili Defconfig
+      - name: Configure & Compile Vili Kernel
         run: |
           export ARCH=arm64
           export SUBARCH=arm64
           export PATH="$HOME/clang/bin:$PATH"
 
-          # Load your edited vili_defconfig directly
+          # Load your verified vili_defconfig directly
           make O=out ARCH=arm64 vili_defconfig
 
-          # Ensure clean -NEXTGEN version string, strip conflicting drivers, and enable pure Vili + BPF + ReSukiSU
+          # Only ensure LOCALVERSION stays strictly "-NEXTGEN" without extra git suffixes
           ./scripts/config --file out/.config \
             --set-str LOCALVERSION "-NEXTGEN" \
-            -d LOCALVERSION_AUTO \
-            -d MACH_XIAOMI_VENUS \
-            -d QTI_BATTERY_CHARGER_VENUS \
-            -d MI_WIRELESS \
-            -d BQ_FG_1S \
-            -d TOUCHSCREEN_ST_FTS_V521_SPI \
-            -d TOUCHSCREEN_FTS \
-            -d DRM_MSM \
-            -d MODVERSIONS \
-            -d MODULE_SIG \
-            -e MACH_XIAOMI_VILI \
-            -e QTI_BATTERY_CHARGER \
-            -e BQ2597X \
-            -e TOUCHSCREEN_GOODIX_BRL \
-            -e SND_SOC_CS35L41 \
-            -e SND_SOC_WCD938X \
-            -e SND_SOC_WSA883X \
-            -e BPF_SYSCALL \
-            -e CGROUP_BPF \
-            -e KSU \
-            -e KSU_SUSFS
+            -d LOCALVERSION_AUTO
 
           make O=out ARCH=arm64 olddefconfig
 
@@ -96,12 +76,12 @@ jobs:
           sed -i 's/device.name1=.*/device.name1=vili/' anykernel.sh
           sed -i 's|BLOCK=.*|BLOCK=/dev/block/bootdevice/by-name/boot;|' anykernel.sh
           sed -i 's/IS_SLOT_DEVICE=.*/IS_SLOT_DEVICE=1;/' anykernel.sh
-          zip -r9 ../vili-NEXTGEN-HyperOS.zip * -x .git README.md *placeholder
+          zip -r9 ../vili-NEXTGEN-Kernel.zip * -x .git README.md *placeholder
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: vili-NEXTGEN-HyperOS
+          name: vili-NEXTGEN-Kernel
           path: |
-            vili-NEXTGEN-HyperOS.zip
+            vili-NEXTGEN-Kernel.zip
             out/arch/arm64/boot/Image
