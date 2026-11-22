@@ -1,110 +1,82 @@
-name: Build Kernel for Xiaomi 11T Pro (vili)
+name: Build Vili HyperOS QGKI Kernel
 
 on:
   workflow_dispatch:
 
 jobs:
   build:
-    name: Build Kernel for Xiaomi 11T Pro (vili)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
-      - name: Checkout Source
-        uses: actions/checkout@v4
-        with:
-          submodules: 'recursive'
-          fetch-depth: 1
+      - name: Maximize Build Disk Space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          df -h
 
-      - name: Setup Build Environment
+      - name: Install Build Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y git ccache automake flex lzop bison gperf build-essential zip curl zlib1g-dev g++-multilib libxml2-utils bzip2 libbz2-dev libbz2-1.0 libghc-bzlib-dev squashfs-tools pngcrush schedtool dpkg-dev lz4 make optipng bc libssl-dev libelf-dev libfl-dev python3 python-is-python3 device-tree-compiler wget
+          sudo apt-get install -y git bc bison build-essential ccache curl flex \
+            g++-multilib gcc-multilib gnupg gperf imagemagick \
+            lib32ncurses-dev lib32readline-dev lib32z1-dev \
+            liblz4-tool libncurses6 libncurses-dev libsdl1.2-dev \
+            libssl-dev libxml2 libxml2-utils lzop pngcrush \
+            rsync schedtool squashfs-tools xsltproc zip zlib1g-dev python3
 
-      - name: Download Clang Toolchain
-        run: |
-          mkdir -p toolchain
-          git clone --depth=1 https://github.com/LineageOS/android_prebuilts_clang_kernel_linux-x86_clang-r416183b.git toolchain/clang
+      - name: Checkout MiYume Kernel Source
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
 
-      - name: Compile Kernel Image & DTBs
+      - name: Download ZyC Clang Toolchain
         run: |
-          export PATH="${GITHUB_WORKSPACE}/toolchain/clang/bin:$PATH"
+          mkdir -p $HOME/clang && cd $HOME/clang
+          CLANG_URL=$(curl -s https://github.com | grep "browser_download_url.*tar.gz" | cut -d '"' -f 4)
+          curl -L "$CLANG_URL" -o clang.tar.gz
+          tar -xzf clang.tar.gz && rm clang.tar.gz
+
+      - name: Configure & Merge Vili Defconfig
+        run: |
           export ARCH=arm64
           export SUBARCH=arm64
-          export KBUILD_BUILD_USER="frenkymahn"
-          export KBUILD_BUILD_HOST="GitHub-Actions"
+          export PATH="$HOME/clang/bin:$PATH"
 
-          MAKE_PARAMS=(
-            ARCH=arm64
-            CC=clang
-            LD=ld.lld
-            AR=llvm-ar
-            NM=llvm-nm
-            OBJCOPY=llvm-objcopy
-            OBJDUMP=llvm-objdump
-            STRIP=llvm-strip
-            CROSS_COMPILE=aarch64-linux-gnu-
-            CROSS_COMPILE_ARM32=arm-linux-gnueabi-
-            CLANG_TRIPLE=aarch64-linux-gnu-
-          )
+          # Load base SM8350 config from MiYume repo
+          make O=out ARCH=arm64 venus_defconfig
 
-          make O=out "${MAKE_PARAMS[@]}" vili_defconfig
+          # Merge your custom vili_defconfig (Touch, Audio, BPF, KSU)
+          chmod +x scripts/kconfig/merge_config.sh
+          ./scripts/kconfig/merge_config.sh -m -O out out/.config arch/arm64/configs/vili_defconfig
+          make O=out ARCH=arm64 olddefconfig
 
-          # Fix touchscreen driver linker errors
-          sed -i 's/CONFIG_TOUCHSCREEN_ST_FTS_V521_SPI=y/# CONFIG_TOUCHSCREEN_ST_FTS_V521_SPI is not set/' out/.config
-          sed -i 's/CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5=y/# CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5 is not set/' out/.config
-          sed -i 's/CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_I2C=y/# CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_I2C is not set/' out/.config
-          sed -i 's/CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_DEVICE_ACCESS=y/# CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_DEVICE_ACCESS is not set/' out/.config
-          sed -i 's/CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_LOADER=y/# CONFIG_TOUCHSCREEN_CYPRESS_CYTTSP5_LOADER is not set/' out/.config
-
-          make -j$(nproc --all) O=out "${MAKE_PARAMS[@]}" Image dtbs
-
-      - name: Package with AnyKernel3 (Exact Venus Layout)
+      - name: Compile Kernel
         run: |
-          git clone https://github.com/osm0sis/AnyKernel3.git --depth=1 anykernel
+          export ARCH=arm64
+          export SUBARCH=arm64
+          export PATH="$HOME/clang/bin:$PATH"
 
-          # 1. Base Kernel Image
-          cp out/arch/arm64/boot/Image anykernel/Image
+          make -j$(nproc --all) O=out ARCH=arm64 \
+            CC=clang \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+            LLVM=1 \
+            LLVM_IAS=1
 
-          # 2. Append all Lahaina compiled DTBs to make 46MB single Image
-          find out/ -name "*.dtb" -exec cat {} + >> anykernel/Image
+      - name: Package with AnyKernel3
+        run: |
+          git clone --depth=1 https://github.com AnyKernel3
+          cp out/arch/arm64/boot/Image AnyKernel3/Image
+          cd AnyKernel3
+          sed -i 's/device.name1=.*/device.name1=vili/' anykernel.sh
+          sed -i 's|BLOCK=.*|BLOCK=/dev/block/bootdevice/by-name/boot;|' anykernel.sh
+          sed -i 's/IS_SLOT_DEVICE=.*/IS_SLOT_DEVICE=1;/' anykernel.sh
+          zip -r9 ../vili-MiYume-HyperOS-Kernel.zip * -x .git README.md *placeholder
 
-          # 3. Create phantom-package.json exactly as in Venus
-          cat << 'EOF' > anykernel/phantom-package.json
-          {
-            "package_name": "Next-Gen Kernel",
-            "device": "vili",
-            "version": "1.0",
-            "author": "frenkymahn",
-            "features": [
-              "KernelSU",
-              "BBR2",
-              "eBPF"
-            ]
-          }
-          EOF
-          sed -i 's/^          //' anykernel/phantom-package.json
-
-          # 4. Create patch folder with magisk stub if needed
-          mkdir -p anykernel/patch
-          touch anykernel/patch/.placeholder
-
-          # 5. Adapt anykernel.sh for vili
-          sed -i 's/kernel.string=.*/kernel.string=Next-Gen Kernel For Xiaomi 11T Pro (vili)/g' anykernel/anykernel.sh
-          sed -i 's/do.devicecheck=1/do.devicecheck=0/g' anykernel/anykernel.sh
-          sed -i 's/device.name1=.*/device.name1=vili/g' anykernel/anykernel.sh
-          sed -i 's/device.name2=.*/device.name2=viliin/g' anykernel/anykernel.sh
-          sed -i 's/device.name3=.*/device.name3=haydn/g' anykernel/anykernel.sh
-          sed -i 's/block=auto/block=boot/g' anykernel/anykernel.sh
-          sed -i 's/is_slot_device=0/is_slot_device=auto/g' anykernel/anykernel.sh
-
-          cd anykernel
-          echo "Checking generated contents:"
-          ls -lh
-          ZIP_NAME="Next-Gen-vili-$(date +'%Y%m%d_%H%M%S').zip"
-          zip -r9 "../$ZIP_NAME" * -x .git README.md *placeholder
-          echo "ZIP_PATH=$ZIP_NAME" >> $GITHUB_ENV
-
-      - name: Upload Artifact
+      - name: Upload Artifacts (AnyKernel3 Zip & Raw Image)
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.ZIP_PATH }}
-          path: ${{ env.ZIP_PATH }}
+          name: vili-MiYume-HyperOS-Build
+          path: |
+            vili-MiYume-HyperOS-Kernel.zip
+            out/arch/arm64/boot/Image
