@@ -1,4 +1,4 @@
-name: Build Vili HyperOS QGKI Kernel
+name: Build Vili HyperOS QGKI Kernel (Full Fix)
 
 on:
   workflow_dispatch:
@@ -34,27 +34,45 @@ jobs:
           submodules: recursive
           fetch-depth: 1
 
+      - name: Update ReSukiSU Driver to Match Manager v4.2.0
+        run: |
+          git submodule update --remote --merge KernelSU || true
+
       - name: Checkout AnyKernel3
         uses: actions/checkout@v4
         with:
           repository: osm0sis/AnyKernel3
           path: AnyKernel3
 
-      - name: Configure & Merge Vili Defconfig
+      - name: Configure & Merge Vili Defconfig (Anti-Reboot + Audio + BPF)
         run: |
           export ARCH=arm64
           export SUBARCH=arm64
           export PATH="$HOME/clang/bin:$PATH"
 
-          # Load base SM8350 config from MiYume repo
+          # Load base SM8350 config
           make O=out ARCH=arm64 venus_defconfig
 
-          # Merge your custom vili_defconfig (Touch, Audio, BPF, KSU)
+          # Merge custom vili_defconfig
           chmod +x scripts/kconfig/merge_config.sh
           ./scripts/kconfig/merge_config.sh -m -O out out/.config arch/arm64/configs/vili_defconfig
 
-          # Fix duplicate symbol collisions (DRM_MSM & TOUCHSCREEN_FTS)
-          ./scripts/config --file out/.config -d DRM_MSM -d TOUCHSCREEN_FTS
+          # Fix duplicate symbols, disable venus battery driver (fixes random reboot),
+          # remove spaces in LOCALVERSION (fixes About Phone Unavailable), and keep KSU + BPF active
+          ./scripts/config --file out/.config \
+            -d DRM_MSM \
+            -d TOUCHSCREEN_FTS \
+            -d QTI_BATTERY_CHARGER_VENUS \
+            -e QTI_BATTERY_CHARGER \
+            -d MODVERSIONS \
+            -d MODULE_SIG \
+            -e KSU \
+            -e BPF \
+            -e BPF_SYSCALL \
+            -e BPF_JIT \
+            -e CGROUP_BPF \
+            --set-str LOCALVERSION "-MiYume-Vili"
+
           make O=out ARCH=arm64 olddefconfig
 
       - name: Compile Kernel
@@ -78,12 +96,12 @@ jobs:
           sed -i 's/device.name1=.*/device.name1=vili/' anykernel.sh
           sed -i 's|BLOCK=.*|BLOCK=/dev/block/bootdevice/by-name/boot;|' anykernel.sh
           sed -i 's/IS_SLOT_DEVICE=.*/IS_SLOT_DEVICE=1;/' anykernel.sh
-          zip -r9 ../vili-MiYume-HyperOS-Kernel.zip * -x .git README.md *placeholder
+          zip -r9 ../vili-MiYume-HyperOS-Fixed.zip * -x .git README.md *placeholder
 
-      - name: Upload Artifacts (AnyKernel3 Zip & Raw Image)
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: vili-MiYume-HyperOS-Build
+          name: vili-MiYume-HyperOS-Fixed
           path: |
-            vili-MiYume-HyperOS-Kernel.zip
+            vili-MiYume-HyperOS-Fixed.zip
             out/arch/arm64/boot/Image
