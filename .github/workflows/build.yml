@@ -34,7 +34,7 @@ jobs:
           submodules: recursive
           fetch-depth: 1
 
-      - name: Update ReSukiSU to Latest Version (35061+ for Manager v4.2.0)
+      - name: Update ReSukiSU to Latest Version (v4.2.0-rc3)
         run: |
           if [ -d "KernelSU" ]; then
             cd KernelSU
@@ -89,11 +89,13 @@ jobs:
 
           make O=out ARCH=arm64 vili_defconfig
 
-          # Disable old SUSFS hooks that conflict with latest ReSukiSU, keep -NEXTGEN clean
+          # Use Manual Hook for 5.4 GKI 1.0 + ReSukiSU v4.2.0-rc3, disable TP hooks & old SUSFS
           ./scripts/config --file out/.config \
             --set-str LOCALVERSION "-NEXTGEN" \
             -d LOCALVERSION_AUTO \
             -d KSU_SUSFS \
+            -d KSU_TRACEPOINT_HOOK \
+            -e KSU_MANUAL_HOOK \
             -e KSU
 
           make O=out ARCH=arm64 olddefconfig
