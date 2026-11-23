@@ -17,7 +17,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             git bc bison build-essential ccache curl flex \
-            libssl-dev libelf-dev python3 zip unzip cpio mkbootimg \
+            libssl-dev libelf-dev python3 zip unzip cpio \
             clang-18 lld-18 llvm-18 binutils-aarch64-linux-gnu binutils-arm-linux-gnueabi
 
           mkdir -p $HOME/clang/bin
@@ -55,37 +55,9 @@ jobs:
             cd ..
           fi
 
-      - name: Patch Peak Brightness & Module Version Check
+      - name: Patch Module Symbol CRC Check
         run: |
           python3 -c '
-          import os, re
-
-          # 1. Force cap bl_max_level across ALL display driver C files (fixes boot animation peak brightness)
-          patched_files = 0
-          for root, _, files in os.walk("techpack/display"):
-              for fname in files:
-                  if fname.endswith(".c"):
-                      path = os.path.join(root, fname)
-                      with open(path, "r", errors="ignore") as f:
-                          content = f.read()
-                      new_content = re.sub(
-                          r"(bl_config->bl_max_level\s*=\s*[^;]+;)",
-                          r"\1\n\tif (bl_config->bl_max_level > 2047) bl_config->bl_max_level = 2047;",
-                          content
-                      )
-                      new_content = re.sub(
-                          r"(bl_config->bl_level\s*=\s*)bl_config->bl_max_level;",
-                          r"\1(bl_config->bl_max_level / 2);",
-                          new_content
-                      )
-                      if new_content != content:
-                          with open(path, "w") as f:
-                              f.write(new_content)
-                          patched_files += 1
-                          print(f"Patched brightness in {path}")
-          print(f"Total display files patched: {patched_files}")
-
-          # 2. Bypass Module Symbol CRC Check
           with open("kernel/module.c", "r") as f:
               code = f.read()
           target = "static int check_version(const struct load_info *info,"
@@ -119,13 +91,11 @@ jobs:
             -d BQ_FG_1S \
             -e QTI_BATTERY_CHARGER \
             -e SND_SOC_CS35L41 \
-            -e SND_SOC_CS35L41_I2C \
-            -e BUILD_ARM64_DT_OVERLAY \
-            -e CONFIG_BUILD_ARM64_DT_OVERLAY
+            -e SND_SOC_CS35L41_I2C
 
           make O=out ARCH=arm64 olddefconfig
 
-          make -j$(nproc --all) O=out ARCH=arm64 Image dtbs modules \
+          make -j$(nproc --all) O=out ARCH=arm64 Image modules \
             CC="ccache clang" \
             CLANG_TRIPLE=aarch64-linux-gnu- \
             CROSS_COMPILE=aarch64-linux-gnu- \
@@ -135,21 +105,16 @@ jobs:
 
           ccache -s
 
-      - name: Package with AnyKernel3 (Auto-Flash boot + dtbo + modules)
+      - name: Package with AnyKernel3 (Working DTB + DTBO + Vendor Modules)
         run: |
           export PATH="$HOME/clang/bin:$PATH"
 
-          # 1. Copy Kernel Image
+          # 1. Copy Kernel Image + Proven Working DTB & DTBO
           cp out/arch/arm64/boot/Image AnyKernel3/Image
+          cp prebuilt_vili/dtb AnyKernel3/dtb
+          cp prebuilt_vili/dtbo.img AnyKernel3/dtbo.img
 
-          # 2. Create dtbo.img
-          VILI_DTBO=$(find out/arch/arm64/boot/dts -name "*vili*.dtbo")
-          if [ -n "$VILI_DTBO" ]; then
-            mkdtboimg create AnyKernel3/dtbo.img $VILI_DTBO
-            ls -lh AnyKernel3/dtbo.img
-          fi
-
-          # 3. Strip & package .ko modules into AnyKernel3
+          # 2. Strip & copy all compiled .ko modules (Audio, Camera, Flash, Wi-Fi)
           make O=out ARCH=arm64 \
             LLVM=1 \
             LLVM_IAS=1 \
@@ -159,9 +124,11 @@ jobs:
             modules_install
 
           mkdir -p AnyKernel3/modules/vendor/lib/modules
+          mkdir -p AnyKernel3/modules/system/lib/modules
           find out/modules_out -name "*.ko" -exec cp {} AnyKernel3/modules/vendor/lib/modules/ \;
+          find out/modules_out -name "*.ko" -exec cp {} AnyKernel3/modules/system/lib/modules/ \;
 
-          # 4. Configure AnyKernel3 & inject dtbo flash + boot-time module bind-mount
+          # 3. Configure AnyKernel3 & flash dtbo.img alongside boot
           cd AnyKernel3
           sed -i 's/device.name1=.*/device.name1=vili/' anykernel.sh
           sed -i 's/device.name2=.*/device.name2=umi/' anykernel.sh

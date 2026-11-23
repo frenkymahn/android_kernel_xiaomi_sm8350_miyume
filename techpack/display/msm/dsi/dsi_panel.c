@@ -2633,12 +2633,12 @@ static int dsi_panel_parse_bl_config(struct dsi_panel *panel)
 		if (rc) {
 			DSI_DEBUG("[%s] bl-max-level unspecified, defaulting to max level\n",
 				panel->name);
-			panel->bl_config.bl_max_level = MAX_BL_LEVEL;
+			panel->bl_config.bl_max_level = 2047;
 		} else {
-			panel->bl_config.bl_max_level = val;
+			panel->bl_config.bl_max_level = (val > 2047) ? 2047 : val;
 		}
 	} else {
-		panel->bl_config.bl_max_level = val;
+		panel->bl_config.bl_max_level = (val > 2047) ? 2047 : val;
 	}
 
 	rc = utils->read_u32(utils->data, "qcom,mdss-factory-brightness-max-level",
@@ -2663,9 +2663,9 @@ static int dsi_panel_parse_bl_config(struct dsi_panel *panel)
 	if (rc) {
 		DSI_DEBUG("[%s] bl-max-level unspecified, defaulting to max level\n",
 			 panel->name);
-		panel->bl_config.bl_max_level = MAX_BL_LEVEL;
+		panel->bl_config.bl_max_level = 2047;
 	} else {
-		panel->bl_config.bl_max_level = val;
+		panel->bl_config.bl_max_level = (val > 2047) ? 2047 : val;
 	}
 
 	rc = utils->read_u32(utils->data, "qcom,mdss-brightness-max-level",
