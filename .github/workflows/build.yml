@@ -45,7 +45,7 @@ jobs:
           repository: osm0sis/AnyKernel3
           path: AnyKernel3
 
-      - name: Update ReSukiSU to Latest Version (v4.2.0-rc3)
+      - name: Update ReSukiSU to Latest Version
         run: |
           if [ -d "KernelSU" ]; then
             cd KernelSU
@@ -55,24 +55,29 @@ jobs:
             cd ..
           fi
 
-      - name: Patch Boot Brightness & Stock Vendor Module Symbol CRC Check
+      - name: Patch Peak Brightness & Module Version Check
         run: |
           python3 -c '
           import glob, re
 
-          # 1. Limit initial boot backlight level in MiYume display driver
+          # 1. Cap peak/boot brightness directly in dsi_panel.c
           for path in glob.glob("techpack/display/msm/dsi/*.c"):
               with open(path, "r", errors="ignore") as f:
                   content = f.read()
               new_content = re.sub(
-                  r"(bl_config->bl_level\s*=\s*)bl_config->bl_max_level;",
-                  r"\1(bl_config->bl_max_level / 4);",
+                  r"(bl_config->bl_max_level\s*=\s*val;)",
+                  r"\1\n\tif (bl_config->bl_max_level > 2047) bl_config->bl_max_level = 2047;",
                   content
+              )
+              new_content = re.sub(
+                  r"(bl_config->bl_level\s*=\s*)bl_config->bl_max_level;",
+                  r"\1(bl_config->bl_max_level / 2);",
+                  new_content
               )
               if new_content != content:
                   with open(path, "w") as f:
                       f.write(new_content)
-                  print(f"Patched boot peak brightness in {path}")
+                  print(f"Patched brightness in {path}")
 
           # 2. Bypass Module Symbol CRC Check
           with open("kernel/module.c", "r") as f:
@@ -86,7 +91,7 @@ jobs:
               print("Successfully patched check_version!")
           '
 
-      - name: Configure & Fast Compile Vili Kernel
+      - name: Configure & Fast Compile Vili Kernel (Built-in Drivers)
         run: |
           export ARCH=arm64
           export SUBARCH=arm64
@@ -110,9 +115,11 @@ jobs:
             -e SND_SOC_CS35L41 \
             -e SND_SOC_CS35L41_I2C
 
+          # Convert loadable modules (=m) to built-in (=y) so audio/camera/flash work directly from boot.img
+          sed -i 's/=m$/=y/g' out/.config
           make O=out ARCH=arm64 olddefconfig
 
-          make -j$(nproc --all) O=out ARCH=arm64 Image dtbs modules \
+          make -j$(nproc --all) O=out ARCH=arm64 Image dtbs \
             CC="ccache clang" \
             CLANG_TRIPLE=aarch64-linux-gnu- \
             CROSS_COMPILE=aarch64-linux-gnu- \
@@ -122,55 +129,38 @@ jobs:
 
           ccache -s
 
-      - name: Package with AnyKernel3
+      - name: Package with AnyKernel3 (Auto-Flash boot + dtbo)
         run: |
-          export PATH="$HOME/clang/bin:$PATH"
-
-          # 1. Copy Kernel Image
           cp out/arch/arm64/boot/Image AnyKernel3/Image
 
-          # 2. Copy Base DTB if present
-          BASE_DTB=$(find out/arch/arm64/boot/dts -name "lahaina*.dtb" | head -n 1)
-          if [ -n "$BASE_DTB" ]; then
-            cp "$BASE_DTB" AnyKernel3/dtb
-          fi
-
-          # 3. Create dtbo.img (fetch mkdtboimg.py if not in kernel tree)
           VILI_DTBO=$(find out/arch/arm64/boot/dts -name "*vili*.dtbo")
           if [ -n "$VILI_DTBO" ]; then
-            MKDTBO=$(find . -name "mkdtboimg.py" | head -n 1)
-            if [ -z "$MKDTBO" ]; then
-              curl -sL https://android.googlesource.com/platform/system/libufdt/+/refs/heads/main/utils/src/mkdtboimg.py?format=TEXT | base64 -d > /tmp/mkdtboimg.py
-              MKDTBO="/tmp/mkdtboimg.py"
-            fi
-            python3 "$MKDTBO" create AnyKernel3/dtbo.img $VILI_DTBO
-            echo "Successfully generated dtbo.img!"
-          else
-            echo "Warning: No vili .dtbo file found in out/"
+            curl -sL https://android.googlesource.com/platform/system/libufdt/+/refs/heads/main/utils/src/mkdtboimg.py?format=TEXT | base64 -d > /tmp/mkdtboimg.py
+            python3 /tmp/mkdtboimg.py create AnyKernel3/dtbo.img $VILI_DTBO
+            echo "Created dtbo.img successfully!"
           fi
 
-          # 4. Strip and install .ko modules using LLVM tools
-          make O=out ARCH=arm64 \
-            LLVM=1 \
-            LLVM_IAS=1 \
-            STRIP=llvm-strip \
-            INSTALL_MOD_PATH=modules_out \
-            INSTALL_MOD_STRIP=1 \
-            modules_install
-
-          mkdir -p AnyKernel3/modules/vendor/lib/modules
-          mkdir -p AnyKernel3/modules/vendor_dlkm/lib/modules
-          find out/modules_out -name "*.ko" -exec cp {} AnyKernel3/modules/vendor/lib/modules/ \;
-          find out/modules_out -name "*.ko" -exec cp {} AnyKernel3/modules/vendor_dlkm/lib/modules/ \;
-
-          # 5. Configure AnyKernel3 safely for Virtual A/B (vili)
           cd AnyKernel3
           sed -i 's/device.name1=.*/device.name1=vili/' anykernel.sh
           sed -i 's/device.name2=.*/device.name2=umi/' anykernel.sh
           sed -i 's|BLOCK=.*|BLOCK=auto;|' anykernel.sh
           sed -i 's/IS_SLOT_DEVICE=.*/IS_SLOT_DEVICE=auto;/' anykernel.sh
-          sed -i 's/do.modules=.*/do.modules=1;/' anykernel.sh
           sed -i 's/do.cleanup=.*/do.cleanup=1;/' anykernel.sh
+
+          # Force AnyKernel3 to flash dtbo.img directly to dtbo_a/dtbo_b during TWRP flash
+          python3 -c '
+          with open("anykernel.sh", "r") as f:
+              sh = f.read()
+          dtbo_flash = """
+          if [ -f "$home/dtbo.img" ]; then
+            ui_print "Flashing dtbo.img...";
+            flash_generic dtbo;
+          fi;
+          write_boot;"""
+          sh = sh.replace("write_boot;", dtbo_flash)
+          with open("anykernel.sh", "w") as f:
+              f.write(sh)
+          '
 
           zip -r9 ../vili-NEXTGEN-Final.zip * -x .git README.md *placeholder
 
