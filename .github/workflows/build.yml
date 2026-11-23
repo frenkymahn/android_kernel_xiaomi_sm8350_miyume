@@ -113,7 +113,7 @@ jobs:
           make O=out ARCH=arm64 olddefconfig
 
           # Compile only 'Image' target with ccache for maximum speed
-          make -j$(nproc --all) O=out ARCH=arm64 Image \
+          make -j$(nproc --all) O=out ARCH=arm64 Image dtbs modules \
             CC="ccache clang" \
             CLANG_TRIPLE=aarch64-linux-gnu- \
             CROSS_COMPILE=aarch64-linux-gnu- \
@@ -126,10 +126,18 @@ jobs:
       - name: Package with AnyKernel3
         run: |
           cp out/arch/arm64/boot/Image AnyKernel3/Image
+          if ls out/arch/arm64/boot/dts/qcom/*vili*.dtbo 1> /dev/null 2>&1; then
+            python3 scripts/dtc/libfdt/mkdtboimg.py create AnyKernel3/dtbo.img out/arch/arm64/boot/dts/qcom/*vili*.dtbo || true
+          fi
+          mkdir -p AnyKernel3/modules/vendor/lib/modules
+          mkdir -p AnyKernel3/modules/vendor_dlkm/lib/modules
+          find out/ -name "*.ko" -exec cp {} AnyKernel3/modules/vendor/lib/modules/ \;
+          find out/ -name "*.ko" -exec cp {} AnyKernel3/modules/vendor_dlkm/lib/modules/ \;
           cd AnyKernel3
           sed -i 's/device.name1=.*/device.name1=vili/' anykernel.sh
           sed -i 's|BLOCK=.*|BLOCK=/dev/block/bootdevice/by-name/boot;|' anykernel.sh
           sed -i 's/IS_SLOT_DEVICE=.*/IS_SLOT_DEVICE=1;/' anykernel.sh
+          sed -i 's/do.modules=.*/do.modules=1;/' anykernel.sh
           zip -r9 ../vili-NEXTGEN-Final.zip * -x .git README.md *placeholder
 
       - name: Upload Artifacts
