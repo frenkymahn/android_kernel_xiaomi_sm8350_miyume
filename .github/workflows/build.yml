@@ -1,4 +1,4 @@
-name: Build Vili -NEXTGEN Kernel (Clean MiYume + Vili Fixes)
+name: Build Vili -NEXTGEN Kernel (MiYume + Official Xiaomi MiCode Vili)
 
 on:
   workflow_dispatch:
@@ -34,11 +34,41 @@ jobs:
           submodules: recursive
           fetch-depth: 1
 
+      - name: Checkout Official Xiaomi MiCode Vili Source (vili-r-oss)
+        uses: actions/checkout@v4
+        with:
+          repository: MiCode/Xiaomi_Kernel_OpenSource
+          ref: vili-r-oss
+          path: micode_vili
+          fetch-depth: 1
+
       - name: Checkout AnyKernel3
         uses: actions/checkout@v4
         with:
           repository: osm0sis/AnyKernel3
           path: AnyKernel3
+
+      - name: Import Official Xiaomi Vili Hardware (DTS, Panel, Camera, Audio)
+        run: |
+          # 1. Import Xiaomi's official vili Device Tree & K3S Display Panel files
+          mkdir -p arch/arm64/boot/dts/vendor/qcom
+          cp -rf micode_vili/arch/arm64/boot/dts/vendor/qcom/vili* arch/arm64/boot/dts/vendor/qcom/ || true
+          cp -rf micode_vili/arch/arm64/boot/dts/vendor/qcom/dsi-panel-k3s* arch/arm64/boot/dts/vendor/qcom/ || true
+          cp -rf micode_vili/arch/arm64/boot/dts/qcom/vili* arch/arm64/boot/dts/qcom/ || true
+
+          # 2. Import Xiaomi's official vili Camera & Flashlight sensor configs (without breaking MiYume headers)
+          cp -rf micode_vili/techpack/camera/drivers/cam_sensor_module/cam_sensor/* techpack/camera/drivers/cam_sensor_module/cam_sensor/ || true
+          cp -rf micode_vili/techpack/camera/drivers/cam_sensor_module/cam_flash/* techpack/camera/drivers/cam_sensor_module/cam_flash/ || true
+
+          # 3. Import Xiaomi's official vili Audio machine & codec configs
+          cp -rf micode_vili/techpack/audio/asoc/lahaina.c techpack/audio/asoc/lahaina.c || true
+          cp -rf micode_vili/techpack/audio/asoc/codecs/cs35l41* techpack/audio/asoc/codecs/ || true
+
+          # 4. Import Xiaomi's official vili Display panel brightness & MI_DISP files
+          cp -rf micode_vili/techpack/display/msm/dsi/dsi_panel* techpack/display/msm/dsi/ || true
+          cp -rf micode_vili/techpack/display/msm/mi_disp/* techpack/display/msm/mi_disp/ || true
+
+          rm -rf micode_vili
 
       - name: Update ReSukiSU to Latest Version (v4.2.0-rc3)
         run: |
@@ -50,12 +80,12 @@ jobs:
             cd ..
           fi
 
-      - name: Fix Boot Peak Brightness & Bypass Module Symbol CRC Check
+      - name: Patch Boot Brightness & Stock Vendor Module Symbol CRC Check
         run: |
           python3 -c '
           import glob, re
 
-          # 1. Fix Boot Animation Peak Brightness in MiYume Display Driver
+          # 1. Limit initial boot backlight level to prevent peak brightness flash
           for path in glob.glob("techpack/display/msm/dsi/*.c"):
               with open(path, "r", errors="ignore") as f:
                   content = f.read()
@@ -69,7 +99,7 @@ jobs:
                       f.write(new_content)
                   print(f"Patched boot peak brightness in {path}")
 
-          # 2. Bypass Module Symbol CRC Check (Allows Stock Vendor Audio, Camera & GPU .ko Modules to Load)
+          # 2. Bypass Module Symbol CRC Check so Stock HyperOS V816.0.22.0 .ko Modules Load Cleanly
           with open("kernel/module.c", "r") as f:
               code = f.read()
           target = "static int check_version(const struct load_info *info,"
@@ -89,7 +119,7 @@ jobs:
 
           make O=out ARCH=arm64 vili_defconfig
 
-          # Ensure -NEXTGEN version, Manual Hook for 5.4 ReSukiSU v4.2.0-rc3, and clean Vili flags
+          # Ensure -NEXTGEN version, Manual Hook for 5.4 ReSukiSU v4.2.0-rc3, and Vili hardware flags
           ./scripts/config --file out/.config \
             --set-str LOCALVERSION "-NEXTGEN" \
             -d LOCALVERSION_AUTO \
@@ -98,7 +128,9 @@ jobs:
             -e KSU_MANUAL_HOOK \
             -e KSU \
             -e MACH_XIAOMI_VILI \
-            -d MACH_XIAOMI_VENUS
+            -d MACH_XIAOMI_VENUS \
+            -e SND_SOC_CS35L41 \
+            -e SND_SOC_CS35L41_I2C
 
           make O=out ARCH=arm64 olddefconfig
 
@@ -113,16 +145,19 @@ jobs:
       - name: Package with AnyKernel3
         run: |
           cp out/arch/arm64/boot/Image AnyKernel3/Image
+          if [ -f out/arch/arm64/boot/dts/vendor/qcom/vili-sm8350.dtb ]; then
+            cp out/arch/arm64/boot/dts/vendor/qcom/vili-sm8350.dtb AnyKernel3/dtb
+          fi
           cd AnyKernel3
           sed -i 's/device.name1=.*/device.name1=vili/' anykernel.sh
           sed -i 's|BLOCK=.*|BLOCK=/dev/block/bootdevice/by-name/boot;|' anykernel.sh
           sed -i 's/IS_SLOT_DEVICE=.*/IS_SLOT_DEVICE=1;/' anykernel.sh
-          zip -r9 ../vili-NEXTGEN-MiYume-Fixed.zip * -x .git README.md *placeholder
+          zip -r9 ../vili-NEXTGEN-MiCode-Full.zip * -x .git README.md *placeholder
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: vili-NEXTGEN-MiYume-Fixed
+          name: vili-NEXTGEN-MiCode-Full
           path: |
-            vili-NEXTGEN-MiYume-Fixed.zip
+            vili-NEXTGEN-MiCode-Full.zip
             out/arch/arm64/boot/Image
