@@ -1,4 +1,4 @@
-name: Build Vili -NEXTGEN Kernel
+name: Build Vili -NEXTGEN Kernel (Brightness + Latest ReSukiSU + Audio Fix)
 
 on:
   workflow_dispatch:
@@ -34,9 +34,47 @@ jobs:
           submodules: recursive
           fetch-depth: 1
 
-      - name: Update ReSukiSU Driver
+      - name: Update ReSukiSU to Latest Version (35061+ for Manager v4.2.0)
         run: |
-          git submodule update --remote --merge KernelSU || true
+          # Remove outdated 30701 KernelSU submodule and pull latest ReSukiSU
+          if [ -d "KernelSU" ]; then
+            cd KernelSU
+            git fetch --all --tags
+            LATEST_TAG=$(git describe --tags $(git rev-list --tags --max-count=1) 2>/dev/null || echo "main")
+            git checkout "$LATEST_TAG" || git checkout main || true
+            cd ..
+          fi
+
+      - name: Fix Boot Animation Peak Brightness & Stock Vendor Audio Modules
+        run: |
+          python3 -c '
+          import glob, re
+
+          # 1. Fix Boot Animation Peak Brightness in Xiaomi/QCOM Display Driver
+          for path in glob.glob("techpack/display/msm/dsi/*.c"):
+              with open(path, "r", errors="ignore") as f:
+                  content = f.read()
+              new_content = re.sub(
+                  r"(bl_config->bl_level\s*=\s*)bl_config->bl_max_level;",
+                  r"\1(bl_config->bl_max_level / 4);",
+                  content
+              )
+              if new_content != content:
+                  with open(path, "w") as f:
+                      f.write(new_content)
+                  print(f"Patched boot peak brightness in {path}")
+
+          # 2. Bypass Module Symbol CRC Check so Stock V816.0.22.0 Audio/GPU .ko Modules Load
+          with open("kernel/module.c", "r") as f:
+              code = f.read()
+          target = "static int check_version(const struct load_info *info,"
+          if target in code:
+              idx = code.find("{", code.find(target)) + 1
+              code = code[:idx] + "\n\treturn 1;" + code[idx:]
+              with open("kernel/module.c", "w") as f:
+                  f.write(code)
+              print("Successfully patched check_version for stock vendor modules!")
+          '
 
       - name: Checkout AnyKernel3
         uses: actions/checkout@v4
@@ -50,17 +88,14 @@ jobs:
           export SUBARCH=arm64
           export PATH="$HOME/clang/bin:$PATH"
 
-          # Load your verified vili_defconfig directly
           make O=out ARCH=arm64 vili_defconfig
 
-          # Only ensure LOCALVERSION stays strictly "-NEXTGEN" without extra git suffixes
           ./scripts/config --file out/.config \
             --set-str LOCALVERSION "-NEXTGEN" \
             -d LOCALVERSION_AUTO
 
           make O=out ARCH=arm64 olddefconfig
 
-          # Compile the kernel
           make -j$(nproc --all) O=out ARCH=arm64 \
             CC=clang \
             CLANG_TRIPLE=aarch64-linux-gnu- \
@@ -76,12 +111,12 @@ jobs:
           sed -i 's/device.name1=.*/device.name1=vili/' anykernel.sh
           sed -i 's|BLOCK=.*|BLOCK=/dev/block/bootdevice/by-name/boot;|' anykernel.sh
           sed -i 's/IS_SLOT_DEVICE=.*/IS_SLOT_DEVICE=1;/' anykernel.sh
-          zip -r9 ../vili-NEXTGEN-Kernel.zip * -x .git README.md *placeholder
+          zip -r9 ../vili-NEXTGEN-Complete.zip * -x .git README.md *placeholder
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: vili-NEXTGEN-Kernel
+          name: vili-NEXTGEN-Complete
           path: |
-            vili-NEXTGEN-Kernel.zip
+            vili-NEXTGEN-Complete.zip
             out/arch/arm64/boot/Image
