@@ -663,6 +663,7 @@ error:
 
 int dsi_panel_set_backlight(struct dsi_panel *panel, u32 bl_lvl)
 {
+	if (bl_lvl > 2047) bl_lvl = 2047;
 	int rc = 0;
 	struct dsi_backlight_config *bl = &panel->bl_config;
 
@@ -1837,7 +1838,7 @@ const char *cmd_set_prop_map[DSI_CMD_SET_MAX] = {
 	/* xiaomi add start */
 	"mi,mdss-dsi-dimmingon-command",
 	"mi,mdss-dsi-dimmingoff-command",
-	"mi,mdss-dsi-hbm-on-command",
+	"mi,mdss-dsi-hbm-on-disabled",
 	"mi,mdss-dsi-hbm-off-command",
 	"mi,mdss-dsi-hbm-fod-on-command",
 	"mi,mdss-dsi-hbm-fod-off-command",
@@ -1857,9 +1858,9 @@ const char *cmd_set_prop_map[DSI_CMD_SET_MAX] = {
 	"mi,mdss-dsi-timing-switch-dc-hbm-command",
 	"mi,mdss-dsi-nolp-command",
 	"mi,mdss-dsi-crc-off-command",
-	"mi,mdss-dsi-local-hbm-normal-white-1000nit-command",
-	"mi,mdss-dsi-local-hbm-hlpm-white-1000nit-command",
-	"mi,mdss-dsi-local-hbm-normal-white-750nit-command",
+	"mi,mdss-dsi-local-hbm-1000nit-disabled",
+	"mi,mdss-dsi-local-hbm-hlpm-1000nit-disabled",
+	"mi,mdss-dsi-local-hbm-750nit-disabled",
 	"mi,mdss-dsi-local-hbm-normal-white-500nit-command",
 	"mi,mdss-dsi-local-hbm-normal-white-110nit-command",
 	"mi,mdss-dsi-local-hbm-hlpm-white-110nit-command",

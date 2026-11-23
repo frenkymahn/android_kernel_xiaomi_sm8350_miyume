@@ -55,20 +55,6 @@ jobs:
             cd ..
           fi
 
-      - name: Patch Module Symbol CRC Check
-        run: |
-          python3 -c '
-          with open("kernel/module.c", "r") as f:
-              code = f.read()
-          target = "static int check_version(const struct load_info *info,"
-          if target in code:
-              idx = code.find("{", code.find(target)) + 1
-              code = code[:idx] + "\n\treturn 1;" + code[idx:]
-              with open("kernel/module.c", "w") as f:
-                  f.write(code)
-              print("Successfully patched check_version!")
-          '
-
       - name: Configure & Fast Compile Vili Kernel
         run: |
           export ARCH=arm64
@@ -95,7 +81,7 @@ jobs:
 
           make O=out ARCH=arm64 olddefconfig
 
-          make -j$(nproc --all) O=out ARCH=arm64 Image modules \
+          make -j$(nproc --all) O=out ARCH=arm64 Image \
             CC="ccache clang" \
             CLANG_TRIPLE=aarch64-linux-gnu- \
             CROSS_COMPILE=aarch64-linux-gnu- \
@@ -105,54 +91,17 @@ jobs:
 
           ccache -s
 
-      - name: Package with AnyKernel3 (Working DTB + DTBO + Vendor Modules)
+      - name: Package Image with AnyKernel3 (Safe for A15/A16 ROMs)
         run: |
-          export PATH="$HOME/clang/bin:$PATH"
-
-          # 1. Copy Kernel Image + Proven Working DTB & DTBO
           cp out/arch/arm64/boot/Image AnyKernel3/Image
-          cp prebuilt_vili/dtb AnyKernel3/dtb
-          cp prebuilt_vili/dtbo.img AnyKernel3/dtbo.img
 
-          # 2. Strip & copy all compiled .ko modules (Audio, Camera, Flash, Wi-Fi)
-          make O=out ARCH=arm64 \
-            LLVM=1 \
-            LLVM_IAS=1 \
-            STRIP=llvm-strip \
-            INSTALL_MOD_PATH=modules_out \
-            INSTALL_MOD_STRIP=1 \
-            modules_install
-
-          mkdir -p AnyKernel3/modules/vendor/lib/modules
-          mkdir -p AnyKernel3/modules/system/lib/modules
-          find out/modules_out -name "*.ko" -exec cp {} AnyKernel3/modules/vendor/lib/modules/ \;
-          find out/modules_out -name "*.ko" -exec cp {} AnyKernel3/modules/system/lib/modules/ \;
-
-          # 3. Configure AnyKernel3 & flash dtbo.img alongside boot
           cd AnyKernel3
           sed -i 's/device.name1=.*/device.name1=vili/' anykernel.sh
           sed -i 's/device.name2=.*/device.name2=umi/' anykernel.sh
           sed -i 's|BLOCK=.*|BLOCK=auto;|' anykernel.sh
           sed -i 's/IS_SLOT_DEVICE=.*/IS_SLOT_DEVICE=auto;/' anykernel.sh
-          sed -i 's/do.modules=.*/do.modules=1;/' anykernel.sh
+          sed -i 's/do.modules=.*/do.modules=0;/' anykernel.sh
           sed -i 's/do.cleanup=.*/do.cleanup=1;/' anykernel.sh
-
-          python3 -c '
-          with open("anykernel.sh", "r") as f:
-              sh = f.read()
-          dtbo_flash = """
-          if [ -f "$home/dtbo.img" ]; then
-            ui_print "Flashing dtbo.img...";
-            flash_generic dtbo;
-          fi;
-          flash_boot;"""
-          if "flash_boot;" in sh:
-              sh = sh.replace("flash_boot;", dtbo_flash)
-          else:
-              sh = sh.replace("write_boot;", dtbo_flash.replace("flash_boot;", "write_boot;"))
-          with open("anykernel.sh", "w") as f:
-              f.write(sh)
-          '
 
           zip -r9 ../vili-NEXTGEN-Final.zip * -x .git README.md *placeholder
 
