@@ -24,4 +24,3 @@ dtb-$(CONFIG_ARCH_QCOM)	+= qcs404-evb-1000.dtb
 dtb-$(CONFIG_ARCH_QCOM)	+= qcs404-evb-4000.dtb
 
 dtbo-$(CONFIG_ARCH_LAHAINA) += vili-sm8350-overlay.dtbo
-vili-sm8350-overlay.dtbo-base := lahaina.dtb
