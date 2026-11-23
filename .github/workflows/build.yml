@@ -1,4 +1,4 @@
-name: Build Vili -NEXTGEN Kernel (MiYume + Official Xiaomi MiCode Vili)
+name: Build Vili -NEXTGEN Kernel (Fast Build)
 
 on:
   workflow_dispatch:
@@ -12,15 +12,12 @@ jobs:
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
           df -h
 
-      - name: Install Build Dependencies & Clang 18
+      - name: Install Fast Minimal Dependencies & Clang 18
         run: |
           sudo apt-get update
-          sudo apt-get install -y git bc bison build-essential ccache curl flex \
-            g++-multilib gcc-multilib gnupg gperf imagemagick \
-            lib32ncurses-dev lib32readline-dev lib32z1-dev \
-            liblz4-tool libncurses6 libncurses-dev libsdl1.2-dev \
-            libssl-dev libxml2 libxml2-utils lzop pngcrush \
-            rsync schedtool squashfs-tools xsltproc zip zlib1g-dev python3 \
+          sudo apt-get install -y --no-install-recommends \
+            git bc bison build-essential ccache curl flex \
+            libssl-dev libelf-dev python3 zip unzip cpio \
             clang-18 lld-18 llvm-18 binutils-aarch64-linux-gnu binutils-arm-linux-gnueabi
 
           mkdir -p $HOME/clang/bin
@@ -34,41 +31,19 @@ jobs:
           submodules: recursive
           fetch-depth: 1
 
-      - name: Checkout Official Xiaomi MiCode Vili Source (vili-r-oss)
-        uses: actions/checkout@v4
+      - name: Setup CCache for Ultra-Fast Rebuilds
+        uses: actions/cache@v4
         with:
-          repository: MiCode/Xiaomi_Kernel_OpenSource
-          ref: vili-r-oss
-          path: micode_vili
-          fetch-depth: 1
+          path: ~/.ccache
+          key: ccache-vili-${{ github.run_id }}
+          restore-keys: |
+            ccache-vili-
 
       - name: Checkout AnyKernel3
         uses: actions/checkout@v4
         with:
           repository: osm0sis/AnyKernel3
           path: AnyKernel3
-
-      - name: Import Official Xiaomi Vili Hardware (DTS, Panel, Camera, Audio)
-        run: |
-          # 1. Import Xiaomi's official vili Device Tree & K3S Display Panel files
-          mkdir -p arch/arm64/boot/dts/vendor/qcom
-          cp -rf micode_vili/arch/arm64/boot/dts/vendor/qcom/vili* arch/arm64/boot/dts/vendor/qcom/ || true
-          cp -rf micode_vili/arch/arm64/boot/dts/vendor/qcom/dsi-panel-k3s* arch/arm64/boot/dts/vendor/qcom/ || true
-          cp -rf micode_vili/arch/arm64/boot/dts/qcom/vili* arch/arm64/boot/dts/qcom/ || true
-
-          # 2. Import Xiaomi's official vili Camera & Flashlight sensor configs (without breaking MiYume headers)
-          cp -rf micode_vili/techpack/camera/drivers/cam_sensor_module/cam_sensor/* techpack/camera/drivers/cam_sensor_module/cam_sensor/ || true
-          cp -rf micode_vili/techpack/camera/drivers/cam_sensor_module/cam_flash/* techpack/camera/drivers/cam_sensor_module/cam_flash/ || true
-
-          # 3. Import Xiaomi's official vili Audio machine & codec configs
-          cp -rf micode_vili/techpack/audio/asoc/lahaina.c techpack/audio/asoc/lahaina.c || true
-          cp -rf micode_vili/techpack/audio/asoc/codecs/cs35l41* techpack/audio/asoc/codecs/ || true
-
-          # 4. Import Xiaomi's official vili Display panel brightness & MI_DISP files
-          cp -rf micode_vili/techpack/display/msm/dsi/dsi_panel* techpack/display/msm/dsi/ || true
-          cp -rf micode_vili/techpack/display/msm/mi_disp/* techpack/display/msm/mi_disp/ || true
-
-          rm -rf micode_vili
 
       - name: Update ReSukiSU to Latest Version (v4.2.0-rc3)
         run: |
@@ -85,7 +60,7 @@ jobs:
           python3 -c '
           import glob, re
 
-          # 1. Limit initial boot backlight level to prevent peak brightness flash
+          # 1. Limit initial boot backlight level in MiYume display driver
           for path in glob.glob("techpack/display/msm/dsi/*.c"):
               with open(path, "r", errors="ignore") as f:
                   content = f.read()
@@ -99,7 +74,7 @@ jobs:
                       f.write(new_content)
                   print(f"Patched boot peak brightness in {path}")
 
-          # 2. Bypass Module Symbol CRC Check so Stock HyperOS V816.0.22.0 .ko Modules Load Cleanly
+          # 2. Bypass Module Symbol CRC Check
           with open("kernel/module.c", "r") as f:
               code = f.read()
           target = "static int check_version(const struct load_info *info,"
@@ -111,15 +86,16 @@ jobs:
               print("Successfully patched check_version!")
           '
 
-      - name: Configure & Compile Vili Kernel
+      - name: Configure & Fast Compile Vili Kernel
         run: |
           export ARCH=arm64
           export SUBARCH=arm64
           export PATH="$HOME/clang/bin:$PATH"
+          export CCACHE_DIR="$HOME/.ccache"
+          ccache -M 5G
 
           make O=out ARCH=arm64 vili_defconfig
 
-          # Ensure -NEXTGEN version, Manual Hook for 5.4 ReSukiSU v4.2.0-rc3, and Vili hardware flags
           ./scripts/config --file out/.config \
             --set-str LOCALVERSION "-NEXTGEN" \
             -d LOCALVERSION_AUTO \
@@ -129,35 +105,37 @@ jobs:
             -e KSU \
             -e MACH_XIAOMI_VILI \
             -d MACH_XIAOMI_VENUS \
+            -d BQ_FG_1S \
+            -e QTI_BATTERY_CHARGER \
             -e SND_SOC_CS35L41 \
             -e SND_SOC_CS35L41_I2C
 
           make O=out ARCH=arm64 olddefconfig
 
-          make -j$(nproc --all) O=out ARCH=arm64 \
-            CC=clang \
+          # Compile only 'Image' target with ccache for maximum speed
+          make -j$(nproc --all) O=out ARCH=arm64 Image \
+            CC="ccache clang" \
             CLANG_TRIPLE=aarch64-linux-gnu- \
             CROSS_COMPILE=aarch64-linux-gnu- \
             CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
             LLVM=1 \
             LLVM_IAS=1
 
+          ccache -s
+
       - name: Package with AnyKernel3
         run: |
           cp out/arch/arm64/boot/Image AnyKernel3/Image
-          if [ -f out/arch/arm64/boot/dts/vendor/qcom/vili-sm8350.dtb ]; then
-            cp out/arch/arm64/boot/dts/vendor/qcom/vili-sm8350.dtb AnyKernel3/dtb
-          fi
           cd AnyKernel3
           sed -i 's/device.name1=.*/device.name1=vili/' anykernel.sh
           sed -i 's|BLOCK=.*|BLOCK=/dev/block/bootdevice/by-name/boot;|' anykernel.sh
           sed -i 's/IS_SLOT_DEVICE=.*/IS_SLOT_DEVICE=1;/' anykernel.sh
-          zip -r9 ../vili-NEXTGEN-MiCode-Full.zip * -x .git README.md *placeholder
+          zip -r9 ../vili-NEXTGEN-Final.zip * -x .git README.md *placeholder
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: vili-NEXTGEN-MiCode-Full
+          name: vili-NEXTGEN-Final
           path: |
-            vili-NEXTGEN-MiCode-Full.zip
+            vili-NEXTGEN-Final.zip
             out/arch/arm64/boot/Image
