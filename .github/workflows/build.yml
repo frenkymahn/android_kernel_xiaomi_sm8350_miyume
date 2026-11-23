@@ -34,11 +34,22 @@ jobs:
           submodules: recursive
           fetch-depth: 1
 
+      - name: Checkout LineageOS SM8350 (Official Vili Hardware Reference)
+        uses: actions/checkout@v4
+        with:
+          repository: LineageOS/android_kernel_xiaomi_sm8350
+          ref: lineage-21
+          path: vili_ref
+          fetch-depth: 1
+
+      - name: Checkout AnyKernel3
+        uses: actions/checkout@v4
+        with:
+          repository: osm0sis/AnyKernel3
+          path: AnyKernel3
+
       - name: Import Official Vili Hardware Drivers (DTS, Camera, Audio, Display)
         run: |
-          # Clone LineageOS SM8350 kernel source containing official vili hardware support
-          git clone --depth=1 https://github.com -b lineage-21 vili_ref
-
           # 1. Copy Vili Device Tree files (Fixes Audio, Camera, Flashlight & Display Panel Nodes)
           cp -rf vili_ref/arch/arm64/boot/dts/vendor/qcom/vili* arch/arm64/boot/dts/vendor/qcom/ || true
           cp -rf vili_ref/arch/arm64/boot/dts/vendor/qcom/dsi-panel-k3s* arch/arm64/boot/dts/vendor/qcom/ || true
@@ -84,12 +95,6 @@ jobs:
               print("Successfully patched check_version!")
           '
 
-      - name: Checkout AnyKernel3
-        uses: actions/checkout@v4
-        with:
-          repository: osm0sis/AnyKernel3
-          path: AnyKernel3
-
       - name: Configure & Compile Vili Kernel
         run: |
           export ARCH=arm64
@@ -128,7 +133,6 @@ jobs:
       - name: Package with AnyKernel3 (Include Vili DTB + Image)
         run: |
           cp out/arch/arm64/boot/Image AnyKernel3/Image
-          # Include compiled vili DTB so Camera, Audio, and Display panel nodes match vili hardware
           if [ -f out/arch/arm64/boot/dts/vendor/qcom/vili-sm8350.dtb ]; then
             cp out/arch/arm64/boot/dts/vendor/qcom/vili-sm8350.dtb AnyKernel3/dtb
           fi
