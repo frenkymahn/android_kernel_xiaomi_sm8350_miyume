@@ -1,4 +1,4 @@
-name: Build Vili -NEXTGEN Kernel (MiYume + Official Vili Hardware)
+name: Build Vili -NEXTGEN Kernel (Clean MiYume + Vili Fixes)
 
 on:
   workflow_dispatch:
@@ -34,44 +34,13 @@ jobs:
           submodules: recursive
           fetch-depth: 1
 
-      - name: Checkout LineageOS SM8350 (Official Vili Hardware Reference)
-        uses: actions/checkout@v4
-        with:
-          repository: LineageOS/android_kernel_xiaomi_sm8350
-          ref: lineage-21
-          path: vili_ref
-          fetch-depth: 1
-
       - name: Checkout AnyKernel3
         uses: actions/checkout@v4
         with:
           repository: osm0sis/AnyKernel3
           path: AnyKernel3
 
-      - name: Import Official Vili Hardware Drivers (DTS, Camera, Audio, Display)
-        run: |
-          # 1. Copy Vili Device Tree files (Fixes Audio, Camera, Flashlight & Display Panel Nodes)
-          cp -rf vili_ref/arch/arm64/boot/dts/vendor/qcom/vili* arch/arm64/boot/dts/vendor/qcom/ || true
-          cp -rf vili_ref/arch/arm64/boot/dts/vendor/qcom/dsi-panel-k3s* arch/arm64/boot/dts/vendor/qcom/ || true
-          cp -f vili_ref/arch/arm64/boot/dts/vendor/qcom/Makefile arch/arm64/boot/dts/vendor/qcom/Makefile || true
-
-          # 2. Import Vili Camera & Flashlight drivers
-          cp -rf vili_ref/techpack/camera/* techpack/camera/ || true
-
-          # 3. Import Vili Audio codec & platform configs
-          cp -rf vili_ref/techpack/audio/* techpack/audio/ || true
-
-          # 4. Import Vili Display panel drivers (Fixes Boot Animation Peak Brightness)
-          cp -rf vili_ref/techpack/display/* techpack/display/ || true
-
-          # 5. Copy official vili config fragments if available
-          mkdir -p arch/arm64/configs/vendor/xiaomi
-          cp -rf vili_ref/arch/arm64/configs/vendor/xiaomi/vili.config arch/arm64/configs/vendor/xiaomi/ || true
-          cp -rf vili_ref/arch/arm64/configs/vendor/xiaomi/sm8350-common.config arch/arm64/configs/vendor/xiaomi/ || true
-
-          rm -rf vili_ref
-
-      - name: Update ReSukiSU to Latest Version
+      - name: Update ReSukiSU to Latest Version (v4.2.0-rc3)
         run: |
           if [ -d "KernelSU" ]; then
             cd KernelSU
@@ -81,9 +50,26 @@ jobs:
             cd ..
           fi
 
-      - name: Bypass Module Symbol CRC Check (Load Stock Vendor .ko Modules)
+      - name: Fix Boot Peak Brightness & Bypass Module Symbol CRC Check
         run: |
           python3 -c '
+          import glob, re
+
+          # 1. Fix Boot Animation Peak Brightness in MiYume Display Driver
+          for path in glob.glob("techpack/display/msm/dsi/*.c"):
+              with open(path, "r", errors="ignore") as f:
+                  content = f.read()
+              new_content = re.sub(
+                  r"(bl_config->bl_level\s*=\s*)bl_config->bl_max_level;",
+                  r"\1(bl_config->bl_max_level / 4);",
+                  content
+              )
+              if new_content != content:
+                  with open(path, "w") as f:
+                      f.write(new_content)
+                  print(f"Patched boot peak brightness in {path}")
+
+          # 2. Bypass Module Symbol CRC Check (Allows Stock Vendor Audio, Camera & GPU .ko Modules to Load)
           with open("kernel/module.c", "r") as f:
               code = f.read()
           target = "static int check_version(const struct load_info *info,"
@@ -103,13 +89,7 @@ jobs:
 
           make O=out ARCH=arm64 vili_defconfig
 
-          # Merge official vili.config fragment on top of your MiYume vili_defconfig
-          if [ -f arch/arm64/configs/vendor/xiaomi/vili.config ]; then
-            chmod +x scripts/kconfig/merge_config.sh
-            ./scripts/kconfig/merge_config.sh -m -O out out/.config arch/arm64/configs/vendor/xiaomi/vili.config
-          fi
-
-          # Ensure -NEXTGEN version, Manual Hook for 5.4 ReSukiSU, and clean symbol resolution
+          # Ensure -NEXTGEN version, Manual Hook for 5.4 ReSukiSU v4.2.0-rc3, and clean Vili flags
           ./scripts/config --file out/.config \
             --set-str LOCALVERSION "-NEXTGEN" \
             -d LOCALVERSION_AUTO \
@@ -130,22 +110,19 @@ jobs:
             LLVM=1 \
             LLVM_IAS=1
 
-      - name: Package with AnyKernel3 (Include Vili DTB + Image)
+      - name: Package with AnyKernel3
         run: |
           cp out/arch/arm64/boot/Image AnyKernel3/Image
-          if [ -f out/arch/arm64/boot/dts/vendor/qcom/vili-sm8350.dtb ]; then
-            cp out/arch/arm64/boot/dts/vendor/qcom/vili-sm8350.dtb AnyKernel3/dtb
-          fi
           cd AnyKernel3
           sed -i 's/device.name1=.*/device.name1=vili/' anykernel.sh
           sed -i 's|BLOCK=.*|BLOCK=/dev/block/bootdevice/by-name/boot;|' anykernel.sh
           sed -i 's/IS_SLOT_DEVICE=.*/IS_SLOT_DEVICE=1;/' anykernel.sh
-          zip -r9 ../vili-NEXTGEN-MiYume-Full.zip * -x .git README.md *placeholder
+          zip -r9 ../vili-NEXTGEN-MiYume-Fixed.zip * -x .git README.md *placeholder
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: vili-NEXTGEN-MiYume-Full
+          name: vili-NEXTGEN-MiYume-Fixed
           path: |
-            vili-NEXTGEN-MiYume-Full.zip
+            vili-NEXTGEN-MiYume-Fixed.zip
             out/arch/arm64/boot/Image
