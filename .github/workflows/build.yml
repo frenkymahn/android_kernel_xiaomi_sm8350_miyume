@@ -129,22 +129,35 @@ jobs:
           # 1. Copy Kernel Image
           cp out/arch/arm64/boot/Image AnyKernel3/Image
 
-          # 2. Copy Base DTB (lahaina) if generated
-          if [ -f "out/arch/arm64/boot/dts/qcom/lahaina.dtb" ]; then
-            cp out/arch/arm64/boot/dts/qcom/lahaina.dtb AnyKernel3/dtb
+          # 2. Copy Base DTB if present
+          BASE_DTB=$(find out/arch/arm64/boot/dts -name "lahaina*.dtb" | head -n 1)
+          if [ -n "$BASE_DTB" ]; then
+            cp "$BASE_DTB" AnyKernel3/dtb
           fi
 
-          # 3. Create dtbo.img using whichever mkdtboimg script exists in source
-          MKDTBO=$(find . -name "mkdtboimg.py" | head -n 1)
-          if [ -n "$MKDTBO" ] && ls out/arch/arm64/boot/dts/qcom/*vili*.dtbo 1> /dev/null 2>&1; then
-            python3 "$MKDTBO" create AnyKernel3/dtbo.img out/arch/arm64/boot/dts/qcom/*vili*.dtbo
+          # 3. Create dtbo.img (fetch mkdtboimg.py if not in kernel tree)
+          VILI_DTBO=$(find out/arch/arm64/boot/dts -name "*vili*.dtbo")
+          if [ -n "$VILI_DTBO" ]; then
+            MKDTBO=$(find . -name "mkdtboimg.py" | head -n 1)
+            if [ -z "$MKDTBO" ]; then
+              curl -sL https://android.googlesource.com/platform/system/libufdt/+/refs/heads/main/utils/src/mkdtboimg.py?format=TEXT | base64 -d > /tmp/mkdtboimg.py
+              MKDTBO="/tmp/mkdtboimg.py"
+            fi
+            python3 "$MKDTBO" create AnyKernel3/dtbo.img $VILI_DTBO
             echo "Successfully generated dtbo.img!"
           else
-            echo "Warning: dtbo.img not created (script or dtbo missing)"
+            echo "Warning: No vili .dtbo file found in out/"
           fi
 
-          # 4. Strip and install .ko modules cleanly (avoids 400MB unstripped size)
-          make O=out ARCH=arm64 INSTALL_MOD_PATH=modules_out INSTALL_MOD_STRIP=1 modules_install
+          # 4. Strip and install .ko modules using LLVM tools
+          make O=out ARCH=arm64 \
+            LLVM=1 \
+            LLVM_IAS=1 \
+            STRIP=llvm-strip \
+            INSTALL_MOD_PATH=modules_out \
+            INSTALL_MOD_STRIP=1 \
+            modules_install
+
           mkdir -p AnyKernel3/modules/vendor/lib/modules
           mkdir -p AnyKernel3/modules/vendor_dlkm/lib/modules
           find out/modules_out -name "*.ko" -exec cp {} AnyKernel3/modules/vendor/lib/modules/ \;
