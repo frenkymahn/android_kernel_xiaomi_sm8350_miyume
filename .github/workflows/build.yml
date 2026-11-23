@@ -1,4 +1,4 @@
-name: Build Vili -NEXTGEN Kernel (Brightness + Latest ReSukiSU + Audio Fix)
+name: Build Vili -NEXTGEN Kernel (All Fixed)
 
 on:
   workflow_dispatch:
@@ -36,7 +36,6 @@ jobs:
 
       - name: Update ReSukiSU to Latest Version (35061+ for Manager v4.2.0)
         run: |
-          # Remove outdated 30701 KernelSU submodule and pull latest ReSukiSU
           if [ -d "KernelSU" ]; then
             cd KernelSU
             git fetch --all --tags
@@ -45,12 +44,12 @@ jobs:
             cd ..
           fi
 
-      - name: Fix Boot Animation Peak Brightness & Stock Vendor Audio Modules
+      - name: Fix Boot Animation Peak Brightness & Stock Vendor Modules
         run: |
           python3 -c '
           import glob, re
 
-          # 1. Fix Boot Animation Peak Brightness in Xiaomi/QCOM Display Driver
+          # 1. Fix Boot Animation Peak Brightness
           for path in glob.glob("techpack/display/msm/dsi/*.c"):
               with open(path, "r", errors="ignore") as f:
                   content = f.read()
@@ -64,7 +63,7 @@ jobs:
                       f.write(new_content)
                   print(f"Patched boot peak brightness in {path}")
 
-          # 2. Bypass Module Symbol CRC Check so Stock V816.0.22.0 Audio/GPU .ko Modules Load
+          # 2. Bypass Module Symbol CRC Check (Fixes Audio, Lag & Flashlight Modules)
           with open("kernel/module.c", "r") as f:
               code = f.read()
           target = "static int check_version(const struct load_info *info,"
@@ -73,7 +72,7 @@ jobs:
               code = code[:idx] + "\n\treturn 1;" + code[idx:]
               with open("kernel/module.c", "w") as f:
                   f.write(code)
-              print("Successfully patched check_version for stock vendor modules!")
+              print("Successfully patched check_version!")
           '
 
       - name: Checkout AnyKernel3
@@ -90,9 +89,12 @@ jobs:
 
           make O=out ARCH=arm64 vili_defconfig
 
+          # Disable old SUSFS hooks that conflict with latest ReSukiSU, keep -NEXTGEN clean
           ./scripts/config --file out/.config \
             --set-str LOCALVERSION "-NEXTGEN" \
-            -d LOCALVERSION_AUTO
+            -d LOCALVERSION_AUTO \
+            -d KSU_SUSFS \
+            -e KSU
 
           make O=out ARCH=arm64 olddefconfig
 
@@ -111,12 +113,12 @@ jobs:
           sed -i 's/device.name1=.*/device.name1=vili/' anykernel.sh
           sed -i 's|BLOCK=.*|BLOCK=/dev/block/bootdevice/by-name/boot;|' anykernel.sh
           sed -i 's/IS_SLOT_DEVICE=.*/IS_SLOT_DEVICE=1;/' anykernel.sh
-          zip -r9 ../vili-NEXTGEN-Complete.zip * -x .git README.md *placeholder
+          zip -r9 ../vili-NEXTGEN-Final.zip * -x .git README.md *placeholder
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: vili-NEXTGEN-Complete
+          name: vili-NEXTGEN-Final
           path: |
-            vili-NEXTGEN-Complete.zip
+            vili-NEXTGEN-Final.zip
             out/arch/arm64/boot/Image
