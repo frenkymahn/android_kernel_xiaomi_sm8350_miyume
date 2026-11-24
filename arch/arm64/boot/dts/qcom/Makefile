@@ -1,3 +1,5 @@
+
+DTC_INCLUDE += $(srctree)/arch/arm64/boot/dts/qcom $(srctree)/arch/arm64/boot/dts/qcom/display $(srctree)/techpack/display/msm
 ifneq ($(CONFIG_ARCH_QTI_VM), y)
 ifeq ($(CONFIG_BUILD_ARM64_DT_OVERLAY),y)
 dtbo-$(CONFIG_ARCH_LAHAINA) += lahaina-rumi-overlay.dtbo \
