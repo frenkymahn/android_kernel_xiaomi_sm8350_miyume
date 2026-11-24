@@ -573,7 +573,7 @@ static void load_gpu(struct drm_device *dev)
 	mutex_lock(&init_lock);
 
 	if (!priv->gpu)
-		priv->gpu = adreno_load_gpu(dev);
+		priv->gpu = NULL; /* adreno_load_gpu(dev); */
 
 	mutex_unlock(&init_lock);
 }
