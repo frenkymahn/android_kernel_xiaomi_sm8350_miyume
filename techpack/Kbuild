@@ -18,3 +18,5 @@ endif
 
 obj-y += audio/ bootinfo/ dataipa/ datarmnet/ datarmnet-ext/ display/ stub/ video/
 header-y += audio/include/uapi/ display/include/uapi stub/ video/
+
+obj-$(CONFIG_MACH_XIAOMI_VILI) += camera/
