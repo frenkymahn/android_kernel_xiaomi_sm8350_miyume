@@ -567,6 +567,7 @@ static int dsi_panel_wled_register(struct dsi_panel *panel,
 int dsi_panel_update_backlight(struct dsi_panel *panel,
 	u32 bl_lvl)
 {
+	bl_lvl = bl_lvl / 2;
 	int rc = 0;
 	unsigned int bl_tmp = 0;
 	unsigned long mode_flags = 0;
