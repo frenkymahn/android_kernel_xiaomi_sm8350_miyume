@@ -78,6 +78,7 @@ msm-y := \
 	msm_atomic_tracepoints.o \
 	msm_debugfs.o \
 	msm_drv.o \
+	msm_kgsl_stubs.o \
 	msm_fb.o \
 	msm_fence.o \
 	msm_gem.o \
