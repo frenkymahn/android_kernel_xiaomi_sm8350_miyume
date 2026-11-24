@@ -63,7 +63,7 @@ jobs:
           export CCACHE_DIR="$HOME/.ccache"
           ccache -M 5G
 
-          mkdir -p out && ARCH=arm64 scripts/kconfig/merge_config.sh -O out arch/arm64/configs/gki_defconfig arch/arm64/configs/vendor/lahaina_QGKI.config arch/arm64/configs/vili_defconfig && sed -i 's/=m$/=y/g' out/.config && scripts/config --file out/.config -e LTO_NONE -d LTO_CLANG_FULL -d LTO_CLANG_THIN -d QCOM_MINIDUMP -e KSU_SUSFS -e DRM_MSM -e DRM_SDE_MI_DISP -e MI_DISP -e MI_DISP_NOTIFIER -e MI_DISP_SYSFS && make O=out ARCH=arm64 olddefconfig
+          mkdir -p out && ARCH=arm64 scripts/kconfig/merge_config.sh -O out arch/arm64/configs/gki_defconfig arch/arm64/configs/vendor/lahaina_QGKI.config arch/arm64/configs/vili_defconfig && sed -i 's/=m$/=y/g' out/.config && scripts/config --file out/.config -e LTO_NONE -d LTO_CLANG_FULL -d LTO_CLANG_THIN -d QCOM_MINIDUMP -e KSU_SUSFS -d DRM_MSM -e DRM_SDE_MI_DISP -e MI_DISP -e MI_DISP_NOTIFIER -e MI_DISP_SYSFS && make O=out ARCH=arm64 olddefconfig
 
           ./scripts/config --file out/.config \
             --set-str LOCALVERSION "-NEXTGEN" \

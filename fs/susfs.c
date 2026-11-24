@@ -1503,3 +1503,9 @@ bool susfs_is_current_proc_no_su(void)
 	return false;
 }
 EXPORT_SYMBOL(susfs_is_current_proc_no_su);
+
+void susfs_clear_current_proc_no_su(void)
+{
+susfs_set_current_proc_no_su(false);
+}
+EXPORT_SYMBOL(susfs_clear_current_proc_no_su);

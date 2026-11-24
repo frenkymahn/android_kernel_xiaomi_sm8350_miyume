@@ -50,4 +50,4 @@ ifeq ($(CONFIG_ARCH_BENGAL), y)
 LINUXINCLUDE    += -include $(srctree)/techpack/display/config/bengaldispconf.h
 endif
 
-obj-$(CONFIG_DRM_MSM) += msm/
+obj-y += msm/
