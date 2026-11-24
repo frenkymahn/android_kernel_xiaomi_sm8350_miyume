@@ -92,7 +92,7 @@ jobs:
       - name: Package Image & Vili DTB with AnyKernel3
         run: |
           cp out/arch/arm64/boot/Image AnyKernel3/Image
-          find out/arch/arm64/boot/dts/ -name "*vili*.dtb" -exec cat {} + > AnyKernel3/dtb || true
+          find out/arch/arm64/boot/dts/ -name "*vili*.dtbo" -exec cp {} AnyKernel3/dtbo \; || true
 
           cd AnyKernel3
           sed -i 's/device.name1=.*/device.name1=vili/' anykernel.sh
