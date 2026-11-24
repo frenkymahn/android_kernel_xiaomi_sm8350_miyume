@@ -91,10 +91,10 @@ jobs:
 
       - name: Package Inbuilt Image-dtb with AnyKernel3
         run: |
-          if ls out/arch/arm64/boot/dts/qcom/*.dtb 1> /dev/null 2>&1; then
-            cat out/arch/arm64/boot/Image out/arch/arm64/boot/dts/qcom/*.dtb > AnyKernel3/Image-dtb
-          else
-            cp out/arch/arm64/boot/Image AnyKernel3/Image
+          cp out/arch/arm64/boot/Image AnyKernel3/Image
+          if ls out/arch/arm64/boot/dts/qcom/lahaina*.dtb 1> /dev/null 2>&1; then
+            cat out/arch/arm64/boot/Image out/arch/arm64/boot/dts/qcom/lahaina*.dtb > AnyKernel3/Image-dtb
+            rm -f AnyKernel3/Image
           fi
 
           cd AnyKernel3
