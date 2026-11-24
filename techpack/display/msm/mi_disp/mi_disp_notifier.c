@@ -46,3 +46,8 @@ int mi_disp_notifier_call_chain(unsigned long val, void *v)
 	return blocking_notifier_call_chain(&mi_disp_notifier_list, val, v);
 }
 EXPORT_SYMBOL(mi_disp_notifier_call_chain);
+int mi_disp_set_fod_queue_work(u32 fod_btn, bool from_touch)
+{
+return 0;
+}
+EXPORT_SYMBOL_GPL(mi_disp_set_fod_queue_work);

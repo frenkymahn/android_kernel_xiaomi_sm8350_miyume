@@ -1509,3 +1509,9 @@ void susfs_clear_current_proc_no_su(void)
 susfs_set_current_proc_no_su();
 }
 EXPORT_SYMBOL(susfs_clear_current_proc_no_su);
+
+void susfs_set_current_proc_umounted_for_zygote_next(void)
+{
+susfs_set_current_proc_umounted();
+}
+EXPORT_SYMBOL(susfs_set_current_proc_umounted_for_zygote_next);
