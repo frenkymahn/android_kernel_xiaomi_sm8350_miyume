@@ -68,10 +68,8 @@ jobs:
           ./scripts/config --file out/.config \
             --set-str LOCALVERSION "-NEXTGEN" \
             -d LOCALVERSION_AUTO \
-            -d KSU_SUSFS \
-            -d KSU_TRACEPOINT_HOOK \
-            -e KSU_MANUAL_HOOK \
             -e KSU \
+            -e KSU_SUSFS \
             -e MACH_XIAOMI_VILI \
             -d MACH_XIAOMI_VENUS \
             -d BQ_FG_1S \
