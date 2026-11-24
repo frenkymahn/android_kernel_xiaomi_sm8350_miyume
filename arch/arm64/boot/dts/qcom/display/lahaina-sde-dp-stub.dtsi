@@ -1,0 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-only
+&{/soc} {
+sde_dp: qcom,sde-dp {
+compatible = "qcom,sde-dp-stub";
+status = "disabled";
+};
+};

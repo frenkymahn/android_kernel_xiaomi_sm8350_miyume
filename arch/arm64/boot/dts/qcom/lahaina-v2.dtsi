@@ -27,6 +27,7 @@
 	/delete-property/ qcom,disable-panic-on-ce;
 };
 
+#include "display/lahaina-sde-dp-stub.dtsi"
 &sde_dp {
 	/delete-node/ qcom,pll-supply-entries;
 };
