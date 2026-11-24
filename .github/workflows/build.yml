@@ -89,10 +89,13 @@ jobs:
 
           ccache -s
 
-      - name: Package Image & Vili DTB with AnyKernel3
+      - name: Package Inbuilt Image-dtb with AnyKernel3
         run: |
-          cp out/arch/arm64/boot/Image AnyKernel3/Image
-          find out/arch/arm64/boot/dts/ -name "*vili*.dtbo" -exec cp {} AnyKernel3/dtbo \; || true
+          if ls out/arch/arm64/boot/dts/qcom/*.dtb 1> /dev/null 2>&1; then
+            cat out/arch/arm64/boot/Image out/arch/arm64/boot/dts/qcom/*.dtb > AnyKernel3/Image-dtb
+          else
+            cp out/arch/arm64/boot/Image AnyKernel3/Image
+          fi
 
           cd AnyKernel3
           sed -i 's/device.name1=.*/device.name1=vili/' anykernel.sh
