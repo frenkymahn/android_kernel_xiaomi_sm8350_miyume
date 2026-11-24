@@ -1491,3 +1491,15 @@ void susfs_init(void) {\
 
 /* No module exit is needed becuase it should never be a loadable kernel module */
 //void __init susfs_exit(void)
+
+/* Compatibility symbols for newer ReSukiSU */
+void susfs_set_current_proc_no_su(void)
+{
+}
+EXPORT_SYMBOL(susfs_set_current_proc_no_su);
+
+bool susfs_is_current_proc_no_su(void)
+{
+	return false;
+}
+EXPORT_SYMBOL(susfs_is_current_proc_no_su);
