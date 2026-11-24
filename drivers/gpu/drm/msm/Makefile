@@ -87,10 +87,10 @@ msm-y := \
 	msm_gem_vma.o \
 # 	msm_gpu.o \
 	msm_iommu.o \
-	msm_perf.o \
+# 	msm_perf.o \
 	msm_rd.o \
 	msm_ringbuffer.o \
-	msm_submitqueue.o \
+# 	msm_submitqueue.o \
 	msm_gpu_tracepoints.o \
 	msm_gpummu.o
 
