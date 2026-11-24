@@ -261,8 +261,6 @@ struct sde_encoder_virt {
 	struct cpumask valid_cpu_mask;
 	struct msm_mode_info mode_info;
 	bool delay_kickoff;
-	bool prepare_kickoff;
-	bool ready_kickoff;
 };
 
 #define to_sde_encoder_virt(x) container_of(x, struct sde_encoder_virt, base)
@@ -276,12 +274,6 @@ struct sde_encoder_virt {
 void sde_encoder_get_hw_resources(struct drm_encoder *encoder,
 		struct sde_encoder_hw_resources *hw_res,
 		struct drm_connector_state *conn_state);
-
-/**
- * sde_encoder_trigger_rsc_state_change - rsc state change.
- * @encoder:	encoder pointer
- */
-void sde_encoder_trigger_rsc_state_change(struct drm_encoder *drm_enc);
 
 /**
  * sde_encoder_early_wakeup - early wake up display
@@ -525,12 +517,12 @@ bool sde_encoder_is_cwb_disabling(struct drm_encoder *drm_enc,
 	struct drm_crtc *drm_crtc);
 
 /**
- * sde_encoder_get_display_type - returns the display_type of underlying
- *     display
+ * sde_encoder_is_primary_display - checks if underlying display is primary
+ *     display or not.
  * @drm_enc:    Pointer to drm encoder structure
- * @Return:     display_type
+ * @Return:     true if it is primary display. false if secondary display
  */
-u32 sde_encoder_get_display_type(struct drm_encoder *enc);
+bool sde_encoder_is_primary_display(struct drm_encoder *enc);
 
 /**
  * sde_encoder_is_dsi_display - checks if underlying display is DSI

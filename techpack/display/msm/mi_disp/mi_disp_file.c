@@ -128,7 +128,7 @@ ssize_t mi_disp_read(struct file *filp, char __user *buffer,
 
 			mutex_unlock(&client->event_lock);
 			ret = wait_event_interruptible(client->event_wait,
-					!list_empty(&client->event_list));
+						       !list_empty(&client->event_list));
 			if (ret >= 0)
 				ret = mutex_lock_interruptible(&client->event_lock);
 			if (ret)
@@ -229,51 +229,38 @@ static int mi_disp_ioctl_set_feature(struct disp_feature_client *client, void *d
 		if (dd_ptr->intf_type == MI_INTF_DSI) {
 			ctl.feature_id = req->feature_id;
 			ctl.feature_val = req->feature_val;
-
-			DISP_DEBUG("%s display set feature: %s, value: %d\n",
-				get_disp_id_name(disp_id),
-				get_disp_feature_id_name(ctl.feature_id), ctl.feature_val);
-
-			if (is_support_disp_feature_id(ctl.feature_id)) {
-				if (req->tx_len) {
-					ctl.tx_len = req->tx_len;
-					ctl.tx_ptr = kzalloc(ctl.tx_len, GFP_KERNEL);
-					if (!ctl.tx_ptr) {
-						ret = -ENOMEM;
-						goto exit;
-					}
-					if (copy_from_user(ctl.tx_ptr, (void __user *)req->tx_ptr,
-						ctl.tx_len) != 0) {
-						ret = -EFAULT;
-						goto err_free_tx;
-					}
+			if (req->tx_len) {
+				ctl.tx_len = req->tx_len;
+				ctl.tx_ptr = kzalloc(ctl.tx_len, GFP_KERNEL);
+				if (!ctl.tx_ptr) {
+					ret = -ENOMEM;
+					goto exit;
 				}
-				if (req->rx_len) {
-					ctl.rx_len = req->rx_len;
-					ctl.rx_ptr = kzalloc(ctl.rx_len, GFP_KERNEL);
-					if (!ctl.rx_ptr) {
-						ret = -ENOMEM;
-						goto err_free_tx;
-					}
+				if (copy_from_user(ctl.tx_ptr, (void __user *)req->tx_ptr, ctl.tx_len) != 0) {
+					ret = -EFAULT;
+					goto err_free_tx;
 				}
+			}
+			if (req->rx_len) {
+				ctl.rx_len = req->rx_len;
+				ctl.rx_ptr = kzalloc(ctl.rx_len, GFP_KERNEL);
+				if (!ctl.rx_ptr) {
+					ret = -ENOMEM;
+					goto err_free_tx;
+				}
+			}
 
-				if (req->base.flag == MI_DISP_FLAG_NONBLOCK) {
-					ret = mi_disp_set_feature_queue_work(dd_ptr, &ctl, sizeof(ctl));
-				} else {
-					ret = mi_dsi_display_set_disp_param(dd_ptr->display, &ctl);
-				}
-
-				if (req->rx_len && !ret) {
-					if (copy_to_user((void __user *)req->rx_ptr, ctl.rx_ptr,
-						ctl.rx_len) != 0) {
-						ret = -EFAULT;
-						goto err_free_rx;
-					}
-				}
+			if (req->base.flag == MI_DISP_FLAG_NONBLOCK) {
+				ret = mi_disp_set_feature_queue_work(dd_ptr, &ctl, sizeof(ctl));
 			} else {
-				DISP_ERROR("unsupported disp feature id\n");
-				ret = -EINVAL;
-				goto exit;
+				ret = mi_dsi_display_set_disp_param(dd_ptr->display, &ctl);
+			}
+
+			if (req->rx_len && !ret) {
+				if (copy_to_user((void __user *)req->rx_ptr, ctl.rx_ptr, ctl.rx_len) != 0) {
+					ret = -EFAULT;
+					goto err_free_rx;
+				}
 			}
 		} else {
 			DISP_INFO("Unsupported display(%s intf)\n",
@@ -294,123 +281,6 @@ err_free_tx:
 	if (ctl.tx_len && ctl.tx_ptr)
 		kfree(ctl.tx_ptr);
 exit:
-	mutex_unlock(&client->client_lock);
-	return ret;
-}
-
-static int mi_disp_ioctl_get_feature(struct disp_feature_client *client, void *data)
-{
-	struct disp_feature *df = client->df;
-	struct disp_feature_req *req = data;
-	u32 disp_id = req->base.disp_id;
-	struct disp_display *dd_ptr = NULL;
-	struct disp_feature_ctl ctl;
-	int ret = 0;
-
-	ret = mutex_lock_interruptible(&client->client_lock);
-	if (ret)
-		return ret;
-
-	memset(&ctl, 0, sizeof(struct disp_feature_ctl));
-
-	if (is_support_disp_id(disp_id)) {
-		dd_ptr = &df->d_display[disp_id];
-		if (dd_ptr->intf_type == MI_INTF_DSI) {
-			ctl.feature_id = req->feature_id;
-
-			DISP_DEBUG("%s display get feature: %s\n", get_disp_id_name(disp_id),
-				get_disp_feature_id_name(ctl.feature_id));
-
-			if (is_support_disp_feature_id(ctl.feature_id)) {
-				if (req->tx_len) {
-					ctl.tx_len = req->tx_len;
-					ctl.tx_ptr = kzalloc(ctl.tx_len, GFP_KERNEL);
-					if (!ctl.tx_ptr) {
-						ret = -ENOMEM;
-						goto exit;
-					}
-					if (copy_from_user(ctl.tx_ptr, (void __user *)req->tx_ptr,
-						ctl.tx_len) != 0) {
-						ret = -EFAULT;
-						goto err_free_tx;
-					}
-				}
-				if (req->rx_len) {
-					ctl.rx_len = req->rx_len;
-					ctl.rx_ptr = kzalloc(ctl.rx_len, GFP_KERNEL);
-					if (!ctl.rx_ptr) {
-						ret = -ENOMEM;
-						goto err_free_tx;
-					}
-				}
-
-				ret = mi_dsi_display_get_disp_param(dd_ptr->display, &ctl);
-				if (!ret) {
-					req->feature_val = ctl.feature_val;
-					if (req->rx_len) {
-						if (copy_to_user((void __user *)req->rx_ptr, ctl.rx_ptr,
-							ctl.rx_len) != 0) {
-							ret = -EFAULT;
-							goto err_free_rx;
-						}
-					}
-				}
-			} else {
-				DISP_ERROR("unsupported disp feature id\n");
-				ret = -EINVAL;
-				goto exit;
-			}
-		} else {
-			DISP_INFO("Unsupported display(%s intf)\n",
-				get_disp_intf_type_name(dd_ptr->intf_type));
-			ret = -EINVAL;
-			goto exit;
-		}
-	} else {
-		DISP_INFO("Unsupported display id\n");
-		ret = -EINVAL;
-		goto exit;
-	}
-
-err_free_rx:
-	if (ctl.rx_len && ctl.rx_ptr)
-		kfree(ctl.rx_ptr);
-err_free_tx:
-	if (ctl.tx_len && ctl.tx_ptr)
-		kfree(ctl.tx_ptr);
-exit:
-	mutex_unlock(&client->client_lock);
-	return ret;
-}
-
-static int mi_disp_ioctl_set_local_hbm(
-			struct disp_feature_client *client, void *data)
-{
-	struct disp_feature *df = client->df;
-	struct disp_local_hbm_req *req = data;
-	u32 disp_id = req->base.disp_id;
-	struct disp_display *dd_ptr = NULL;
-	u32 local_hbm_value;
-	int ret = 0;
-	ret = mutex_lock_interruptible(&client->client_lock);
-	if (ret)
-		return ret;
-	local_hbm_value = req->local_hbm_value;
-	if (is_support_disp_id(disp_id)) {
-		dd_ptr = &df->d_display[disp_id];
-		if (dd_ptr->intf_type == MI_INTF_DSI) {
-			DISP_INFO("%s display local_hbm_value = %d\n",
-				get_disp_id_name(disp_id), local_hbm_value);
-				ret = mi_disp_set_local_hbm(disp_id, local_hbm_value);
-		} else {
-			DISP_INFO("Unsupported display(%s intf)\n",
-				get_disp_intf_type_name(dd_ptr->intf_type));
-			ret = -EINVAL;
-		}
-	} else {
-		DISP_INFO("Unsupported display id\n");
-		ret = -EINVAL;
-	}
 	mutex_unlock(&client->client_lock);
 	return ret;
 }
@@ -899,6 +769,56 @@ static int mi_disp_ioctl_get_brightness(
 	return ret;
 }
 
+int mi_disp_ioctl_get_bic_data(struct disp_feature_client *client, void *data)
+{
+	struct dsi_display *dsi_display = NULL;
+	struct disp_feature *df = client->df;
+	struct disp_bic_info_req *req = data;
+	u32 disp_id = req->base.disp_id;
+	struct disp_display *dd_ptr = NULL;
+	char * bic_data = NULL;
+	char *bic_reg = NULL;
+	int len = 0;
+	int ret = 0;
+
+	ret = mutex_lock_interruptible(&client->event_lock);
+	if (ret)
+		return ret;
+
+	dd_ptr = &df->d_display[disp_id];
+	dsi_display = (struct dsi_display *)dd_ptr->display;
+	DISP_INFO("req->type == %d\n", req->type);
+
+	if (is_support_disp_id(disp_id)) {
+		if (req->type == 0) {
+			bic_data = mi_dsi_display_get_bic_data_info(dd_ptr->display, &len);
+			DISP_INFO("bic data len = %d\n", len);
+			if (req->bic_ptr && len) {
+				req->bic_len = len;
+				ret = copy_to_user(req->bic_ptr, bic_data, len);
+				if (ret != 0) {
+					DISP_INFO("copy to user failed, ret = %d\n", ret);
+					ret = -EFAULT;
+				}
+			}
+		} else if (req->type == 1) {
+			DISP_INFO("req->bic_reg_len == %d\n", req->bic_reg_len);
+			if (req->bic_reg_len) {
+				bic_reg = mi_dsi_display_get_bic_reg_data_array(dd_ptr->display);
+				if (copy_from_user((void __user *)bic_reg, req->bic_reg_ptr, req->bic_reg_len)) {
+					ret = -EFAULT;
+				} else {
+					dsi_display->panel->mi_cfg.nvt_bic_reg_transfer_finshed = true;
+				}
+			}
+		}
+	}
+	mutex_unlock(&client->event_lock);
+
+	return ret;
+}
+
+
 /* Ioctl table */
 static const struct disp_ioctl_desc disp_ioctls[] = {
 	DISP_IOCTL_DEF(MI_DISP_IOCTL_VERSION, mi_disp_ioctl_get_version),
@@ -913,8 +833,7 @@ static const struct disp_ioctl_desc disp_ioctls[] = {
 	DISP_IOCTL_DEF(MI_DISP_IOCTL_WRITE_DSI_CMD, mi_disp_ioctl_write_dsi_cmd),
 	DISP_IOCTL_DEF(MI_DISP_IOCTL_READ_DSI_CMD, mi_disp_ioctl_read_dsi_cmd),
 	DISP_IOCTL_DEF(MI_DISP_IOCTL_GET_BRIGHTNESS, mi_disp_ioctl_get_brightness),
-	DISP_IOCTL_DEF(MI_DISP_IOCTL_GET_FEATURE, mi_disp_ioctl_get_feature),
-	DISP_IOCTL_DEF(MI_DISP_IOCTL_SET_LOCAL_HBM, mi_disp_ioctl_set_local_hbm),
+	DISP_IOCTL_DEF(MI_DISP_IOCTL_GET_BIC, mi_disp_ioctl_get_bic_data),
 };
 
 #define MI_DISP_IOCTL_COUNT	ARRAY_SIZE(disp_ioctls)

@@ -200,8 +200,7 @@ static void dsi_bridge_pre_enable(struct drm_bridge *bridge)
 		return;
 	}
 
-	if (bridge->encoder->crtc->state->active_changed)
-		atomic_set(&c_bridge->display->panel->esd_recovery_pending, 0);
+	atomic_set(&c_bridge->display->panel->esd_recovery_pending, 0);
 	mi_cfg = &c_bridge->display->panel->mi_cfg;
 
 	/* By this point mode should have been validated through mode_fixup */
@@ -1349,19 +1348,6 @@ int dsi_conn_post_kickoff(struct drm_connector *connector,
 		enable = (params->qsync_mode > 0) ? true : false;
 		display_for_each_ctrl(i, display)
 			dsi_ctrl_setup_avr(display->ctrl[i].ctrl, enable);
-	}
-
-	/*
-	 * Publish FOD HBM readiness on the fod_ui sysfs attribute.  The ROM's
-	 * UDFPS handler polls it and captures the fingerprint image only once
-	 * the frame carrying the FOD HBM brightness is on screen.
-	 */
-	if (display && display->panel && display->panel->fod_hbm_sysfs_used &&
-			display->panel->mi_cfg.fod_hbm_layer_enabled &&
-			!display->panel->fod_ui) {
-		sde_encoder_wait_for_event(encoder, MSM_ENC_TX_COMPLETE);
-		sde_encoder_wait_for_event(encoder, MSM_ENC_VBLANK);
-		dsi_panel_set_fod_ui(display->panel, true);
 	}
 
 	return 0;

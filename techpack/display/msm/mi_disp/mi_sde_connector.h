@@ -43,14 +43,13 @@ int mi_sde_connector_debugfs_esd_sw_trigger(void *display);
 static inline int mi_sde_connector_debugfs_esd_sw_trigger(void *display) { return 0; }
 #endif
 
-int mi_sde_connector_panel_ctl(struct drm_connector *connector, uint32_t op_code, bool is_lhbm_ioctl);
+int mi_sde_connector_panel_ctl(struct drm_connector *connector, uint32_t op_code);
 
 void mi_sde_connector_update_layer_state(struct drm_connector *connector,
 	enum mi_layer_type mi_layer_type);
 
 int mi_sde_connector_gir_fence(struct drm_connector *connector);
 int mi_sde_connector_fod_hbm_fence(struct drm_connector *connector);
-int mi_sde_connector_dc_fence(struct drm_connector *connector);
 
 void mi_sde_connector_fod_notify(struct drm_connector *conn);
 

@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
- * Copyright (C) 2021 XiaoMi, Inc.
  */
+#define DEBUG
 #include <linux/slab.h>
 #include <linux/kthread.h>
 #include <linux/kernel.h>
@@ -120,7 +119,7 @@ static int voice_send_cvp_ecns_enable_cmd(struct voice_data *v,
 
 static int is_cal_memory_allocated(void);
 static bool is_cvd_version_queried(void);
-static bool is_voip_memory_allocated(void);
+static int is_voip_memory_allocated(void);
 static int voice_get_cvd_int_version(char *cvd_ver_string);
 static int voice_alloc_cal_mem_map_table(void);
 static int voice_alloc_rtac_mem_map_table(void);
@@ -136,7 +135,7 @@ static int remap_cal_data(struct cal_block_data *cal_block,
 static int voice_unmap_cal_memory(int32_t cal_type,
 				  struct cal_block_data *cal_block);
 
-static bool is_source_tracking_shared_memomry_allocated(void);
+static int is_source_tracking_shared_memomry_allocated(void);
 static int voice_alloc_source_tracking_shared_memory(void);
 static int voice_alloc_and_map_source_tracking_shared_memory(
 						struct voice_data *v);
@@ -2224,7 +2223,7 @@ done:
 }
 
 
-static bool is_voip_memory_allocated(void)
+static int is_voip_memory_allocated(void)
 {
 	bool ret;
 	struct voice_data *v = voice_get_session(
@@ -3851,6 +3850,7 @@ static int voice_map_cal_memory(struct cal_block_data *cal_block,
 		goto done;
 	}
 
+	mutex_lock(&common.common_lock);
 	v = &common.voice[voc_index];
 
 	result = voice_map_memory_physical_cmd(v,
@@ -3864,10 +3864,12 @@ static int voice_map_cal_memory(struct cal_block_data *cal_block,
 			&cal_block->cal_data.paddr,
 			cal_block->map_data.map_size);
 
-		goto done;
+		goto done_unlock;
 	}
 
 	cal_block->map_data.q6map_handle = common.cal_mem_handle;
+done_unlock:
+	mutex_unlock(&common.common_lock);
 done:
 	return result;
 }
@@ -4243,7 +4245,7 @@ static int voice_send_cvp_channel_info_v2(struct voice_data *v,
 	case EC_REF_PATH:
 		channel_info_param_data->param_id =
 			VSS_PARAM_VOCPROC_EC_REF_CHANNEL_INFO;
-#if defined(CONFIG_TARGET_PRODUCT_CETUS) || defined(CONFIG_TARGET_PRODUCT_ARGO)
+#if defined(CONFIG_TARGET_PRODUCT_CETUS)
 		if (v->dev_rx.port_id == 0x9020)
 			channel_info->num_channels = 4;
 		else
@@ -8531,11 +8533,10 @@ static int voice_alloc_oob_shared_mem(void)
 			bufsz * bufcnt,
 			&phys, &len,
 			&mem_addr);
-	if (rc) {
+	if (rc < 0) {
 		pr_err("%s: audio ION alloc failed, rc = %d\n",
 			__func__, rc);
 
-		rc = -EINVAL;
 		goto done;
 	}
 
@@ -8584,11 +8585,10 @@ static int voice_alloc_oob_mem_table(void)
 				&v->shmem_info.memtbl.phys,
 				&len,
 				&(v->shmem_info.memtbl.data));
-	if (rc) {
+	if (rc < 0) {
 		pr_err("%s: audio ION alloc failed, rc = %d\n",
 			__func__, rc);
 
-		rc = -EINVAL;
 		goto done;
 	}
 
@@ -8971,10 +8971,9 @@ static int voice_alloc_cal_mem_map_table(void)
 				&common.cal_mem_map_table.phys,
 				&len,
 				&(common.cal_mem_map_table.data));
-	if ((ret) && (ret != -EPROBE_DEFER)) {
+	if ((ret < 0) && (ret != -EPROBE_DEFER)) {
 		pr_err("%s: audio ION alloc failed, rc = %d\n",
 			__func__, ret);
-		ret = -EINVAL;
 		goto done;
 	}
 
@@ -8998,10 +8997,9 @@ static int voice_alloc_rtac_mem_map_table(void)
 			&common.rtac_mem_map_table.phys,
 			&len,
 			&(common.rtac_mem_map_table.data));
-	if (ret) {
+	if (ret < 0) {
 		pr_err("%s: audio ION alloc failed, rc = %d\n",
 			__func__, ret);
-		ret = -EINVAL;
 		goto done;
 	}
 
@@ -9703,7 +9701,7 @@ int voc_get_sound_focus(struct sound_focus_param *soundFocusData)
 }
 EXPORT_SYMBOL(voc_get_sound_focus);
 
-static bool is_source_tracking_shared_memomry_allocated(void)
+static int is_source_tracking_shared_memomry_allocated(void)
 {
 	bool ret;
 
@@ -9731,7 +9729,7 @@ static int voice_alloc_source_tracking_shared_memory(void)
 		&(common.source_tracking_sh_mem.sh_mem_block.phys),
 		(size_t *)&(common.source_tracking_sh_mem.sh_mem_block.size),
 		&(common.source_tracking_sh_mem.sh_mem_block.data));
-	if (ret) {
+	if (ret < 0) {
 		pr_err("%s: audio ION alloc failed for sh_mem block, ret = %d\n",
 			__func__, ret);
 
@@ -9753,7 +9751,7 @@ static int voice_alloc_source_tracking_shared_memory(void)
 		&(common.source_tracking_sh_mem.sh_mem_table.phys),
 		(size_t *)&(common.source_tracking_sh_mem.sh_mem_table.size),
 		&(common.source_tracking_sh_mem.sh_mem_table.data));
-	if (ret) {
+	if (ret < 0) {
 		pr_err("%s: audio ION alloc failed for sh_mem table, ret = %d\n",
 			__func__, ret);
 
@@ -10361,11 +10359,7 @@ int __init voice_init(void)
 
 void voice_exit(void)
 {
-	int i;
 	q6core_destroy_uevent_data(common.uevent_data);
 	voice_delete_cal_data();
 	free_cal_map_table();
-	mutex_destroy(&common.common_lock);
-	for (i = 0; i < MAX_VOC_SESSIONS; i++)
-		mutex_destroy(&common.voice[i].lock);
 }

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2012-2014, 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (C) 2021 XiaoMi, Inc.
+ * Copyright (c) 2012-2014, 2017-2020, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/init.h>
@@ -17,7 +16,6 @@
 #include <linux/workqueue.h>
 #include <linux/nvmem-consumer.h>
 #include <linux/slab.h>
-#include <soc/qcom/boot_stats.h>
 #include <soc/qcom/subsystem_restart.h>
 
 #define Q6_PIL_GET_DELAY_MS 100
@@ -25,7 +23,6 @@
 #define SSR_RESET_CMD 1
 #define IMAGE_UNLOAD_CMD 0
 #define MAX_FW_IMAGES 4
-#define BOOT_FOR_EARLY_CHIME_CMD 2
 
 static ssize_t adsp_boot_store(struct kobject *kobj,
 	struct kobj_attribute *attr,
@@ -175,7 +172,6 @@ load_adsp:
 	{
 		adsp_state = apr_get_q6_state();
 		if (adsp_state == APR_SUBSYS_DOWN) {
-			place_marker("M - Start ADSP");
 			priv = platform_get_drvdata(pdev);
 			if (!priv) {
 				dev_err(&pdev->dev,
@@ -262,11 +258,7 @@ static ssize_t adsp_boot_store(struct kobject *kobj,
 	} else if (boot == IMAGE_UNLOAD_CMD) {
 		pr_debug("%s: going to call adsp_unloader\n", __func__);
 		adsp_loader_unload(adsp_private);
-	} else if (boot == BOOT_FOR_EARLY_CHIME_CMD) {
-		pr_debug("%s: going to call adsp_load_fw\n", __func__);
-		adsp_load_fw(NULL);
 	}
-
 	return count;
 }
 
@@ -538,6 +530,5 @@ static void __exit adsp_loader_exit(void)
 }
 module_exit(adsp_loader_exit);
 
-MODULE_SOFTDEP("pre: subsys-pil-tz");
 MODULE_DESCRIPTION("ADSP Loader module");
 MODULE_LICENSE("GPL v2");

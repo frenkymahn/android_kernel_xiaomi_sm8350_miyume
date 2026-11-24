@@ -81,7 +81,7 @@ jobs:
 
           make O=out ARCH=arm64 olddefconfig
 
-          make -j$(nproc --all) O=out ARCH=arm64 Image \
+          make -j$(nproc --all) O=out ARCH=arm64 Image dtbs \
             CC="ccache clang" \
             CLANG_TRIPLE=aarch64-linux-gnu- \
             CROSS_COMPILE=aarch64-linux-gnu- \
@@ -91,9 +91,10 @@ jobs:
 
           ccache -s
 
-      - name: Package Image with AnyKernel3 (Safe for A15/A16 ROMs)
+      - name: Package Image & Vili DTB with AnyKernel3
         run: |
           cp out/arch/arm64/boot/Image AnyKernel3/Image
+          find out/arch/arm64/boot/dts/ -name "*vili*.dtb" -exec cat {} + > AnyKernel3/dtb || true
 
           cd AnyKernel3
           sed -i 's/device.name1=.*/device.name1=vili/' anykernel.sh

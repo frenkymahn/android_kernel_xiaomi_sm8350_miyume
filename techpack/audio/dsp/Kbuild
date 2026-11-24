@@ -29,11 +29,6 @@ ifeq ($(CONFIG_SND_SOC_AUTO), y)
 		export
 		INCS    +=  -include $(AUDIO_ROOT)/config/gvmautoconf.h
 	endif
-	ifdef CONFIG_SND_SOC_AR
-		include $(AUDIO_ROOT)/config/arauto.conf
-		export
-		INCS    +=  -include $(AUDIO_ROOT)/config/arautoconf.h
-	endif
 	ifdef CONFIG_SND_SOC_GVM_SA8295
 		include $(AUDIO_ROOT)/config/sa8295gvmauto.conf
 		export
@@ -60,10 +55,6 @@ else
 		ifeq ($(CONFIG_ARCH_KONA), y)
 			include $(AUDIO_ROOT)/config/konaauto.conf
 			INCS    +=  -include $(AUDIO_ROOT)/config/konaautoconf.h
-		endif
-		ifeq ($(CONFIG_ARCH_LAHAINA), y)
-			include $(AUDIO_ROOT)/config/lahainaauto.conf
-			INCS    +=  -include $(AUDIO_ROOT)/config/lahainaautoconf.h
 		endif
 		ifeq ($(CONFIG_ARCH_LITO), y)
 			include $(AUDIO_ROOT)/config/litoauto.conf
@@ -249,10 +240,6 @@ ifdef CONFIG_DIGITAL_CDC_RSC_MGR
 	Q6_OBJS += digital-cdc-rsc-mgr.o
 endif
 
-ifdef CONFIG_MMHARDWARE_DETECTION
-MMHARDWARE_SYSFS += mmhardware_sysfs.o
-endif
-
 LINUX_INC +=	-Iinclude/linux
 
 INCS +=		$(COMMON_INC) \
@@ -260,56 +247,18 @@ INCS +=		$(COMMON_INC) \
 
 EXTRA_CFLAGS += $(INCS)
 
-ifdef CONFIG_MACH_XIAOMI_CETUS
+ifneq (,$(filter $(TARGET_PRODUCT),cetus))
 	CDEFINES += -DCONFIG_TARGET_PRODUCT_CETUS
 endif
 
-ifdef CONFIG_MACH_XIAOMI_ODIN
-	CDEFINES += -DCONFIG_TARGET_PRODUCT_ODIN
-endif
-
-ifdef CONFIG_MACH_XIAOMI_VILI
-	CDEFINES += -DCONFIG_TARGET_PRODUCT_VILI
-endif
-
-ifdef CONFIG_MACH_XIAOMI_ARGO
-	CDEFINES += -DCONFIG_TARGET_PRODUCT_ARGO
-endif
-
-ifdef CONFIG_MACH_XIAOMI_RENOIR
+ifeq ($(TARGET_PRODUCT), renoir)
 	CDEFINES += -DCONFIG_SND_SOC_TFA9874_FOR_DAVI
 	CDEFINES += -DTFA_NON_DSP_SOLUTION
 endif
 
-ifdef CONFIG_MACH_XIAOMI_TAOYAO
-	CDEFINES += -DCONFIG_SND_SOC_TFA9874_FOR_DAVI
-	CDEFINES += -DTFA_NON_DSP_SOLUTION
-	CDEFINES += -DCONFIG_TARGET_PRODUCT_TAOYAO
-endif
-
-ifdef CONFIG_MACH_XIAOMI_LISA
-	CDEFINES += -DCONFIG_SND_SOC_TFA9874_FOR_DAVI
-	CDEFINES += -DTFA_NON_DSP_SOLUTION
-	CDEFINES += -DCONFIG_TARGET_PRODUCT_LISA
-endif
-
-ifdef CONFIG_MACH_XIAOMI_MONA
+ifeq ($(TARGET_PRODUCT), mona)
 	CDEFINES += -DCONFIG_SND_SOC_AW88263S_TDM
 	CDEFINES += -DCONFIG_TARGET_PRODUCT_MONA
-endif
-
-ifdef CONFIG_MACH_XIAOMI_ZIJIN
-	CDEFINES += -DCONFIG_SND_SOC_AW88263S_TDM
-	CDEFINES += -DCONFIG_TARGET_PRODUCT_ZIJIN
-endif
-
-ifdef CONFIG_MACH_XIAOMI_REDWOOD
-	CDEFINES += -DCONFIG_SND_SOC_AW88263S_M20_TDM
-	CDEFINES += -DCONFIG_TARGET_PRODUCT_REDWOOD
-endif
-
-ifdef CONFIG_MIUS_PROXIMITY
-	CDEFINES += -DCONFIG_QGKI_SYSTEM
 endif
 
 CDEFINES +=	-DANI_LITTLE_BYTE_ENDIAN \
@@ -322,14 +271,7 @@ CDEFINES +=	-DANI_LITTLE_BYTE_ENDIAN \
 		-Werror\
 		-D__linux__
 
-# TEST FOR STAR
-ifdef CONFIG_MACH_XIAOMI_STAR
-	CDEFINES += -DAUDIO_FORCE_RESTART_ADSP
-endif
-
-ifneq ($(filter y, $(CONFIG_MACH_XIAOMI_ZIJIN) $(CONFIG_MACH_XIAOMI_TAOYAO)),)
-CDEFINES += -DAUDIO_FORCE_RESTART_ADSP_TEMP
-endif
+# CDEFINES += -DAUDIO_FORCE_RESTART_ADSP
 
 KBUILD_CPPFLAGS += $(CDEFINES)
 
@@ -383,5 +325,5 @@ q6_pdr_dlkm-y := $(QDSP6_PDR_OBJS)
 obj-$(CONFIG_MSM_QDSP6_NOTIFIER) += q6_notifier_dlkm.o
 q6_notifier_dlkm-y := $(QDSP6_NOTIFIER_OBJS)
 
-obj-$(CONFIG_MMHARDWARE_DETECTION) += mmhardware_sysfs_dlkm.o
-mmhardware_sysfs_dlkm-y := $(MMHARDWARE_SYSFS)
+# inject some build related information
+DEFINES += -DBUILD_TIMESTAMP=\"$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')\"

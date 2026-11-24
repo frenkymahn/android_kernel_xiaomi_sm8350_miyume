@@ -21,10 +21,7 @@ struct dsi_display * mi_get_secondary_dsi_display(void);
 int mi_dsi_display_set_disp_param(void *display,
 			struct disp_feature_ctl *ctl);
 
-int mi_dsi_display_get_disp_param(void *display,
-			struct disp_feature_ctl *ctl);
-
-ssize_t mi_dsi_display_show_disp_param(void *display,
+ssize_t mi_dsi_display_get_disp_param(void *display,
 			char *buf, size_t size);
 
 int mi_dsi_display_write_mipi_reg(void *display,
@@ -67,13 +64,8 @@ int mi_dsi_display_set_brightness_clone(void *display,
 int mi_dsi_display_get_brightness_clone(void *display,
 			u32 *brightness_clone);
 
-int mi_dsi_display_get_max_brightness_clone(void *display,
-			u32 *max_brightness_clone);
-
 ssize_t mi_dsi_display_get_hw_vsync_info(void *display,
 			char *buf, size_t size);
-
-
 
 int mi_dsi_display_esd_irq_ctrl(struct dsi_display *display,
 			bool enable);
@@ -83,6 +75,12 @@ void mi_dsi_display_wakeup_pending_doze_work(struct dsi_display *display);
 bool mi_is_doze_full_brightness_supported(void *display);
 
 void mi_dsi_display_update_backlight(struct dsi_display *display);
+
+int mi_dsi_display_read_nvt_bic(void *display);
+
+char *mi_dsi_display_get_bic_data_info(void *display, int * bic_len);
+
+char *mi_dsi_display_get_bic_reg_data_array(void *display);
 
 ssize_t mi_dsi_display_cell_id_read(void *display,
 			char *buf, size_t size);

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2016-2020, 2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
  */
 
 #ifndef _DSI_PANEL_H_
@@ -217,10 +217,6 @@ struct dsi_panel {
 	struct mipi_dsi_host *host;
 	struct device *parent;
 
-	bool fod_ui;
-	bool fod_hbm_requested;
-	bool fod_hbm_sysfs_used;
-
 	struct dsi_host_common_cfg host_config;
 	struct dsi_video_engine_cfg video_config;
 	struct dsi_cmd_engine_cfg cmd_config;
@@ -252,8 +248,6 @@ struct dsi_panel {
 	bool reset_gpio_always_on;
 	atomic_t esd_recovery_pending;
 
-	bool is_twm_en;
-	bool skip_panel_off;
 	bool panel_initialized;
 	bool te_using_watchdog_timer;
 	struct dsi_qsync_capabilities qsync_caps;
@@ -302,9 +296,6 @@ static inline bool dsi_panel_is_type_oled(struct dsi_panel *panel)
 {
 	return (panel->panel_type == DSI_DISPLAY_PANEL_TYPE_OLED);
 }
-
-void dsi_panel_request_fod_hbm(struct dsi_panel *panel, bool status);
-void dsi_panel_set_fod_ui(struct dsi_panel *panel, bool status);
 
 struct dsi_panel *dsi_panel_get(struct device *parent,
 				struct device_node *of_node,
@@ -384,7 +375,6 @@ int dsi_panel_mode_switch_to_vid(struct dsi_panel *panel);
 int dsi_panel_switch(struct dsi_panel *panel);
 
 int dsi_panel_post_switch(struct dsi_panel *panel);
-int dsi_panel_gamma_switch(struct dsi_panel *panel);
 
 void dsi_dsc_pclk_param_calc(struct msm_display_dsc_info *dsc, int intf_width);
 

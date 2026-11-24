@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
  */
 
 #ifndef _DSI_DEFS_H_
@@ -39,7 +39,6 @@
  * @DSI_PIXEL_FORMAT_RGB111:
  * @DSI_PIXEL_FORMAT_RGB332:
  * @DSI_PIXEL_FORMAT_RGB444:
- * @DSI_PIXEL_FORMAT_RGB101010:
  * @DSI_PIXEL_FORMAT_MAX:
  */
 enum dsi_pixel_format {
@@ -50,7 +49,6 @@ enum dsi_pixel_format {
 	DSI_PIXEL_FORMAT_RGB111,
 	DSI_PIXEL_FORMAT_RGB332,
 	DSI_PIXEL_FORMAT_RGB444,
-	DSI_PIXEL_FORMAT_RGB101010,
 	DSI_PIXEL_FORMAT_MAX
 };
 
@@ -300,7 +298,6 @@ enum dsi_cmd_set_type {
 	DSI_CMD_SET_MI_DOZE_LBM,
 	DSI_CMD_SET_MI_DOZE_HBM_NOLP,
 	DSI_CMD_SET_MI_DOZE_LBM_NOLP,
-	DSI_CMD_SET_MI_DOZE_NONE_NOLP,
 	DSI_CMD_SET_MI_FLAT_MODE_ON,
 	DSI_CMD_SET_MI_FLAT_MODE_OFF,
 	DSI_CMD_SET_MI_TIMING_SWITCH,
@@ -342,15 +339,14 @@ enum dsi_cmd_set_type {
 	DSI_CMD_SET_MI_COLOR_INVERT_OFF,
 	DSI_CMD_SET_MI_DEMURA_WHEN_DC_OFF,
 	DSI_CMD_SET_MI_DEMURA_WHEN_DC_ON,
+	DSI_CMD_SET_MI_BIC_READ_PRE,
+	DSI_CMD_SET_MI_BIC_READ,
+	DSI_CMD_SET_MI_BIC_READ_FINISH,
 	DSI_CMD_SET_MI_FLAT_MODE_READ_PRE,
 	DSI_CMD_SET_MI_PRE_DOZE_TO_OFF,
-	DSI_CMD_SET_MI_CUP_DBI,
 	DSI_CMD_SET_MI_TIMING_SWITCH_GIR,
 	DSI_CMD_SET_MI_AOD_TO_DC_ON,
 	DSI_CMD_SET_MI_SWITCH_PAGE4,
-	DSI_CMD_SET_MI_FPS_120_GAMMA,
-	DSI_CMD_SET_MI_FPS_90_GAMMA,
-	DSI_CMD_SET_MI_FPS_60_GAMMA,
 	/* xiaomi add end */
 	DSI_CMD_SET_MAX
 };
@@ -571,7 +567,6 @@ struct dsi_host_common_cfg {
 	u32 dma_sched_line;
 	u32 dma_sched_window;
 	u32 clk_strength;
-	u32 phy_voltage;
 };
 
 /**
@@ -610,17 +605,12 @@ struct dsi_video_engine_cfg {
  * @wr_mem_continue:               DCS command for write_memory_continue.
  * @insert_dcs_command:            Insert DCS command as first byte of payload
  *                                 of the pixel data.
- * @mdp_idle_ctrl_en:		Enable idle insertion between command mode mdp packets.
- * @mdp_idle_ctrl_len:		No. of dsi pclk cycles of idle time to insert between
- *				   command mode mdp packets.
  */
 struct dsi_cmd_engine_cfg {
 	u32 max_cmd_packets_interleave;
 	u32 wr_mem_start;
 	u32 wr_mem_continue;
 	bool insert_dcs_command;
-	bool mdp_idle_ctrl_en;
-	u32 mdp_idle_ctrl_len;
 };
 
 /**
@@ -808,8 +798,6 @@ static inline int dsi_pixel_format_to_bpp(enum dsi_pixel_format fmt)
 		return 8;
 	case DSI_PIXEL_FORMAT_RGB444:
 		return 12;
-	case DSI_PIXEL_FORMAT_RGB101010:
-		return 30;
 	}
 	return 24;
 }

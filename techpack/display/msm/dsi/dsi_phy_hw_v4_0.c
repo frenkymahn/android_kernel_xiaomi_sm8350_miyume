@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/math64.h>
@@ -344,11 +343,7 @@ static void dsi_phy_hw_dphy_enable(struct dsi_phy_hw *phy,
 		glbl_str_swi_cal_sel_ctrl = less_than_1500_mhz ? 0x03 :  0x00;
 		glbl_hstx_str_ctrl_0 = cfg->clk_strength;
 	} else if (phy->version == DSI_PHY_VERSION_4_1) {
-		if (cfg->phy_voltage) {
-			vreg_ctrl_0 = cfg->phy_voltage;
-		} else {
-			vreg_ctrl_0 = less_than_1500_mhz ? 0x53 : 0x52;
-		}
+		vreg_ctrl_0 = less_than_1500_mhz ? 0x53 : 0x52;
 		glbl_rescode_top_ctrl = less_than_1500_mhz ? 0x3d :  0x00;
 		glbl_rescode_bot_ctrl = less_than_1500_mhz ? 0x39 :  0x3c;
 		if (cfg->clk_strength) {
@@ -866,12 +861,4 @@ void dsi_phy_hw_v4_0_set_continuous_clk(struct dsi_phy_hw *phy, bool enable)
 
 	DSI_W32(phy, DSIPHY_CMN_LANE_CTRL1, reg);
 	wmb(); /* make sure request is set */
-}
-
-void dsi_phy_hw_v4_0_phy_idle_off(struct dsi_phy_hw *phy)
-{
-	if (phy->version >= DSI_PHY_VERSION_4_2 && phy->clamp_enable) {
-		DSI_W32(phy, DSIPHY_CMN_CTRL_4, 0x1);
-		DSI_W32(phy, DSIPHY_CMN_CTRL_3, 0x0);
-	}
 }
