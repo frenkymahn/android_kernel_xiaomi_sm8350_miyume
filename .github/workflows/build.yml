@@ -63,7 +63,7 @@ jobs:
           export CCACHE_DIR="$HOME/.ccache"
           ccache -M 5G
 
-          make O=out ARCH=arm64 vili_defconfig
+          ARCH=arm64 scripts/kconfig/merge_config.sh -m -O out arch/arm64/configs/vendor/lahaina_QGKI.config arch/arm64/configs/vili_defconfig
 
           ./scripts/config --file out/.config \
             --set-str LOCALVERSION "-NEXTGEN" \
