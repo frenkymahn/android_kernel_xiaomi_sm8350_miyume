@@ -31,7 +31,9 @@ make O="$OUT_DIR" ARCH=arm64 "$DEFCONFIG"
   -d BQ_FG_1S \
   -e QTI_BATTERY_CHARGER \
   -e SND_SOC_CS35L41 \
-  -e SND_SOC_CS35L41_I2C
+  -e SND_SOC_CS35L41_I2C \
+  -d SENSORS_QTI_AMOLED_ECM \
+  -d QCOM_FSA4480_I2C
 
 make O="$OUT_DIR" ARCH=arm64 olddefconfig
 
