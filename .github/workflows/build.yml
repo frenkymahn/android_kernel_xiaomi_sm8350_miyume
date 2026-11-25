@@ -46,7 +46,7 @@ jobs:
             -e QCOM_SMEM \
             -e QCOM_SCM \
             -e GH_RM_DRV \
-            -e GH_MSGQ \
+            -e GH_CTRL -e GH_RM_DRV -e GH_MSGQ -e GH_MEM_NOTIFIER -e HH_CTRL -e HH_RM_DRV -e HH_MSGQ \
             -d SENSORS_QTI_AMOLED_ECM \
             -d QCOM_FSA4480_I2C \
             -d BACKLIGHT_QCOM_SPMI_WLED \
