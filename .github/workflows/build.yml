@@ -93,11 +93,11 @@ jobs:
 
           ccache -s
 
-      - name: Package Inbuilt Image-dtb with AnyKernel3
+      - name: Package Pure Image with AnyKernel3
         run: |
           cp out/arch/arm64/boot/Image AnyKernel3/Image
           if ls out/arch/arm64/boot/dts/qcom/lahaina*.dtb 1> /dev/null 2>&1; then
-            cat out/arch/arm64/boot/Image out/arch/arm64/boot/dts/qcom/lahaina*.dtb > AnyKernel3/Image-dtb
+            cat out/arch/arm64/boot/Image out/arch/arm64/boot/dts/qcom/lahaina*.dtb > AnyKernel3/Image
             rm -f AnyKernel3/Image
           fi
 
