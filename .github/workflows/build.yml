@@ -68,7 +68,6 @@ jobs:
           ./scripts/config --file out/.config \
             -e SENSORS_QTI_AMOLED_ECM \
             -e REGULATOR_QPNP_AMOLED \
-            -e BACKLIGHT_QCOM_SPMI_WLED \
             -e AUDIO_QGKI \
             -e QCOM_FSA4480_I2C \
             --set-str LOCALVERSION "-NEXTGEN" \
