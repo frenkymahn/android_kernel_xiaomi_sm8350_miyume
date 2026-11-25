@@ -18,6 +18,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
+          submodules: recursive
+
+      - name: Ensure KernelSU Source Exists
+        run: |
+          if [ ! -f drivers/kernelsu/Kconfig ]; then
+            curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -
+          fi
 
       - name: Install Dependencies
         run: |
