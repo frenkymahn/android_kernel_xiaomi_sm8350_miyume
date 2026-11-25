@@ -1151,7 +1151,7 @@ config QCOM_WATCHDOG_PET_TIME
 config QCOM_WATCHDOG_IPI_PING
 	depends on QCOM_WDT_CORE
 	bool "Qualcomm Technologies, Inc. Watchdog ipi ping"
-	default n
+	default y
 	help
 	  This boolean flag gives the watchdog driver the ability to send a
 	  keep-alive ping to other cpu's if it is set to 1. Otherwise, when

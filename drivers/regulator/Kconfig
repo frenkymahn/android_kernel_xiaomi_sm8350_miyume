@@ -971,7 +971,7 @@ config REGULATOR_TI_ABB
 config REGULATOR_STW481X_VMMC
 	bool "ST Microelectronics STW481X VMMC regulator"
 	depends on MFD_STW481X || COMPILE_TEST
-	default n if MFD_STW481X
+	default y if MFD_STW481X
 	help
 	  This driver supports the internal VMMC regulator in the STw481x
 	  PMIC chips.
