@@ -44,11 +44,11 @@ jobs:
             -e KSU_SUSFS \
             -d SENSORS_QTI_AMOLED_ECM \
             -d REGULATOR_QPNP_AMOLED \
-            -d AUDIO_QGKI \
             -d QCOM_FSA4480_I2C \
             -d BACKLIGHT_QCOM_SPMI_WLED \
             -d BUILD_ARM64_APPENDED_DTB_IMAGE
           make O=out ARCH=arm64 olddefconfig
+          grep -E "CONFIG_QCOM_RPMH=|CONFIG_QCOM_FSA4480_I2C=|CONFIG_SENSORS_QTI_AMOLED_ECM=" out/.config
 
       - name: Compile Pure Image
         run: |
