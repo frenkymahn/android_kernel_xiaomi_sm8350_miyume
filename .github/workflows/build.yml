@@ -42,13 +42,16 @@ jobs:
             -e BPF_JIT \
             -e KSU \
             -e KSU_SUSFS \
+            -e QCOM_RPMH \
+            -e QCOM_SMEM \
+            -e QCOM_SCM \
+            -e GH_RM_DRV \
+            -e GH_MSGQ \
             -d SENSORS_QTI_AMOLED_ECM \
-            -d REGULATOR_QPNP_AMOLED \
             -d QCOM_FSA4480_I2C \
             -d BACKLIGHT_QCOM_SPMI_WLED \
             -d BUILD_ARM64_APPENDED_DTB_IMAGE
           make O=out ARCH=arm64 olddefconfig
-          grep -E "CONFIG_QCOM_RPMH=|CONFIG_QCOM_FSA4480_I2C=|CONFIG_SENSORS_QTI_AMOLED_ECM=" out/.config
 
       - name: Compile Pure Image
         run: |
