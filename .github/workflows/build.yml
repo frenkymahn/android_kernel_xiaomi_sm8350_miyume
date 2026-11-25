@@ -5,112 +5,74 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    name: Build Kernel
+    runs-on: ubuntu-22.04
+
     steps:
-      - name: Maximize Build Disk Space
+      - name: Maximize Build Space
         run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
           df -h
 
-      - name: Install Fast Minimal Dependencies & Clang 18
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            git bc bison build-essential ccache curl flex \
-            libssl-dev libelf-dev python3 zip unzip cpio \
-            clang-18 lld-18 llvm-18 binutils-aarch64-linux-gnu binutils-arm-linux-gnueabi
-
-          mkdir -p $HOME/clang/bin
-          for tool in clang clang++ ld.lld llvm-ar llvm-nm llvm-objcopy llvm-objdump llvm-strip llvm-readelf; do
-            ln -sf /usr/bin/${tool}-18 $HOME/clang/bin/${tool}
-          done
-
-      - name: Checkout MiYume Kernel Source
+      - name: Checkout Kernel Source
         uses: actions/checkout@v4
         with:
-          submodules: recursive
           fetch-depth: 1
 
-      - name: Setup CCache for Ultra-Fast Rebuilds
-        uses: actions/cache@v4
-        with:
-          path: ~/.ccache
-          key: ccache-vili-${{ github.run_id }}
-          restore-keys: |
-            ccache-vili-
-
-      - name: Checkout AnyKernel3
-        uses: actions/checkout@v4
-        with:
-          repository: osm0sis/AnyKernel3
-          path: AnyKernel3
-
-      - name: Update ReSukiSU to Latest Version
+      - name: Install Dependencies
         run: |
-          if [ -d "KernelSU" ]; then
-            cd KernelSU
-            git fetch --all --tags
-            LATEST_TAG=$(git describe --tags $(git rev-list --tags --max-count=1) 2>/dev/null || echo "main")
-            git checkout "$LATEST_TAG" || git checkout main || true
-            cd ..
-          fi
+          sudo apt-get update
+          sudo apt-get install -y bc bison build-essential ccache curl flex git gnupg gperf imagemagick lib32ncurses5-dev lib32readline-dev lib32z1-dev liblz4-tool libncurses5 libncurses5-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev clang lld llvm python3 python-is-python3 cpio
 
-      - name: Configure & Fast Compile Vili Kernel
+      - name: Configure Kernel (Vili + Port ROM + Root)
         run: |
-          export ARCH=arm64
-          export SUBARCH=arm64
-          export PATH="$HOME/clang/bin:$PATH"
-          export CCACHE_DIR="$HOME/.ccache"
-          ccache -M 5G
-
-          mkdir -p out && ARCH=arm64 scripts/kconfig/merge_config.sh -O out arch/arm64/configs/gki_defconfig arch/arm64/configs/vendor/lahaina_QGKI.config arch/arm64/configs/vili_defconfig && sed -i 's/=m$/=y/g' out/.config && scripts/config --file out/.config -e LTO_NONE -d LTO_CLANG_FULL -d LTO_CLANG_THIN -d QCOM_MINIDUMP -e KSU_SUSFS -d DRM_MSM -e DRM_SDE_MI_DISP -e MI_DISP -e MI_DISP_NOTIFIER -e MI_DISP_SYSFS && make O=out ARCH=arm64 olddefconfig
-
+          make O=out ARCH=arm64 vili_defconfig
           ./scripts/config --file out/.config \
-            --set-str LOCALVERSION "-NEXTGEN" \
-            -d LOCALVERSION_AUTO \
+            -e OVERLAY_FS \
+            -e TMPFS_XATTR \
+            -e EROFS_FS \
+            -e BPF_SYSCALL \
+            -e BPF_JIT \
             -e KSU \
             -e KSU_SUSFS \
-            -e MACH_XIAOMI_VILI \
-            -d MACH_XIAOMI_VENUS \
-            -d BQ_FG_1S \
-            -e QTI_BATTERY_CHARGER \
-            -e SND_SOC_CS35L41 \
-            -e SND_SOC_CS35L41_I2C
-
+            -d SENSORS_QTI_AMOLED_ECM \
+            -d REGULATOR_QPNP_AMOLED \
+            -d AUDIO_QGKI \
+            -d QCOM_FSA4480_I2C \
+            -d BACKLIGHT_QCOM_SPMI_WLED \
+            -d BUILD_ARM64_APPENDED_DTB_IMAGE
           make O=out ARCH=arm64 olddefconfig
 
-          make -j$(nproc --all) O=out ARCH=arm64 Image dtbs \
-            CC="ccache clang" \
+      - name: Compile Pure Image
+        run: |
+          make -j$(nproc --all) O=out ARCH=arm64 \
+            CC=clang \
+            LD=ld.lld \
+            AR=llvm-ar \
+            NM=llvm-nm \
+            OBJCOPY=llvm-objcopy \
+            OBJDUMP=llvm-objdump \
+            STRIP=llvm-strip \
             CLANG_TRIPLE=aarch64-linux-gnu- \
             CROSS_COMPILE=aarch64-linux-gnu- \
             CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
-            LLVM=1 \
-            LLVM_IAS=1
-
-          ccache -s
+            Image
+          test -f out/arch/arm64/boot/Image || (echo "ERROR: Pure Image not generated!" && exit 1)
 
       - name: Package Pure Image with AnyKernel3
         run: |
-          cp out/arch/arm64/boot/Image AnyKernel3/Image
-          if ls out/arch/arm64/boot/dts/qcom/lahaina*.dtb 1> /dev/null 2>&1; then
-            cat out/arch/arm64/boot/Image out/arch/arm64/boot/dts/qcom/lahaina*.dtb > AnyKernel3/Image
-            rm -f AnyKernel3/Image
-          fi
+          rm -rf AnyKernel3 vili-NEXTGEN-Final.zip
+          git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git AnyKernel3
+          rm -rf AnyKernel3/.git AnyKernel3/README.md AnyKernel3/modules AnyKernel3/patch AnyKernel3/ramdisk
+          cp -f out/arch/arm64/boot/Image AnyKernel3/Image
+          sed -i 's/do.devicecheck=1/do.devicecheck=0/g' AnyKernel3/anykernel.sh
+          sed -i 's/block=\/dev\/block\/platform\/omap\/omap_hsmmc.0\/by-name\/boot;/block=auto;/g' AnyKernel3/anykernel.sh
+          sed -i 's/is_slot_device=0;/is_slot_device=auto;/g' AnyKernel3/anykernel.sh
+          (cd AnyKernel3 && zip -r9 ../vili-NEXTGEN-Final.zip . -x "*.git*" "README.md" "*placeholder*")
+          unzip -l vili-NEXTGEN-Final.zip
 
-          cd AnyKernel3
-          sed -i 's/device.name1=.*/device.name1=vili/' anykernel.sh
-          sed -i 's/device.name2=.*/device.name2=umi/' anykernel.sh
-          sed -i 's|BLOCK=.*|BLOCK=auto;|' anykernel.sh
-          sed -i 's/IS_SLOT_DEVICE=.*/IS_SLOT_DEVICE=auto;/' anykernel.sh
-          sed -i 's/do.modules=.*/do.modules=0;/' anykernel.sh
-          sed -i 's/do.cleanup=.*/do.cleanup=1;/' anykernel.sh
-
-          zip -r9 ../vili-NEXTGEN-Final.zip * -x .git README.md *placeholder
-
-      - name: Upload Artifacts
+      - name: Upload Kernel Artifact
         uses: actions/upload-artifact@v4
         with:
           name: vili-NEXTGEN-Final
-          path: |
-            vili-NEXTGEN-Final.zip
-            out/arch/arm64/boot/Image
+          path: vili-NEXTGEN-Final.zip
