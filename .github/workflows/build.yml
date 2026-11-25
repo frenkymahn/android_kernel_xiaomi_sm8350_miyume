@@ -35,33 +35,30 @@ jobs:
         run: |
           make O=out ARCH=arm64 vili_defconfig
           ./scripts/config --file out/.config \
-            -e OVERLAY_FS \
-            -e TMPFS_XATTR \
-            -e EROFS_FS \
-            -e BPF_SYSCALL \
-            -e BPF_JIT \
+            --set-str LOCALVERSION "-NEXTGEN" \
+            -d LOCALVERSION_AUTO \
             -e KSU \
             -e KSU_SUSFS \
+            -e MACH_XIAOMI_VILI \
+            -d MACH_XIAOMI_VENUS \
+            -d BQ_FG_1S \
+            -e QTI_BATTERY_CHARGER \
+            -e SND_SOC_CS35L41 \
+            -e SND_SOC_CS35L41_I2C \
             -d SENSORS_QTI_AMOLED_ECM \
             -d QCOM_FSA4480_I2C \
-            -d BACKLIGHT_QCOM_SPMI_WLED \
             -d BUILD_ARM64_APPENDED_DTB_IMAGE
-          make O=out ARCH=arm64 olddefconfig
+          yes "" | make O=out ARCH=arm64 CC=clang LLVM=1 LLVM_IAS=1 olddefconfig
 
       - name: Compile Pure Image
         run: |
-          make -j$(nproc --all) O=out ARCH=arm64 \
+          make -j$(nproc --all) O=out ARCH=arm64 Image \
             CC=clang \
-            LD=ld.lld \
-            AR=llvm-ar \
-            NM=llvm-nm \
-            OBJCOPY=llvm-objcopy \
-            OBJDUMP=llvm-objdump \
-            STRIP=llvm-strip \
             CLANG_TRIPLE=aarch64-linux-gnu- \
             CROSS_COMPILE=aarch64-linux-gnu- \
             CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
-            Image modules
+            LLVM=1 \
+            LLVM_IAS=1
           test -f out/arch/arm64/boot/Image || (echo "ERROR: Pure Image not generated!" && exit 1)
 
       - name: Package Pure Image with AnyKernel3
