@@ -31,10 +31,39 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y bc bison build-essential ccache curl flex git gnupg gperf imagemagick lib32ncurses5-dev lib32readline-dev lib32z1-dev liblz4-tool libncurses5 libncurses5-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev clang lld llvm python3 python-is-python3 cpio
 
-      - name: Run Original build.sh
+      - name: Configure Kernel (QGKI + Vili + Panic Fixes)
         run: |
-          bash build.sh vili
-          test -f out/arch/arm64/boot/Image || (echo "ERROR: Image not generated!" && exit 1)
+          rm -rf out
+          mkdir -p out
+          ARCH=arm64 scripts/kconfig/merge_config.sh -m -O out \
+            arch/arm64/configs/vendor/lahaina_QGKI.config \
+            arch/arm64/configs/vili_defconfig
+          ./scripts/config --file out/.config \
+            --set-str LOCALVERSION "-NEXTGEN" \
+            -d LOCALVERSION_AUTO \
+            -e KSU \
+            -e KSU_SUSFS \
+            -e MACH_XIAOMI_VILI \
+            -d MACH_XIAOMI_VENUS \
+            -d BQ_FG_1S \
+            -e QTI_BATTERY_CHARGER \
+            -e SND_SOC_CS35L41 \
+            -e SND_SOC_CS35L41_I2C \
+            -d SENSORS_QTI_AMOLED_ECM \
+            -d QCOM_FSA4480_I2C \
+            -d BUILD_ARM64_APPENDED_DTB_IMAGE
+          make O=out ARCH=arm64 olddefconfig
+
+      - name: Compile Pure Image
+        run: |
+          make -j$(nproc --all) O=out ARCH=arm64 Image \
+            CC=clang \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+            LLVM=1 \
+            LLVM_IAS=1
+          test -f out/arch/arm64/boot/Image || (echo "ERROR: Pure Image not generated!" && exit 1)
 
       - name: Package Pure Image with AnyKernel3
         run: |
