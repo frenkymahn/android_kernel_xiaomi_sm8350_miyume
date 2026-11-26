@@ -46,6 +46,17 @@ jobs:
             -e MACH_XIAOMI_VILI \
             -d MACH_XIAOMI_VENUS \
             -d BQ_FG_1S \
+            -e QCOM_SCM \
+            -e HH_RM_DRV \
+            -e QCOM_RPMH \
+            -e QCOM_RPMHPD \
+            -e QCOM_SMEM \
+            -e QCOM_MINIDUMP \
+            -e MSM_MINIDUMP \
+            -e QCOM_MEMORY_DUMP_V2 \
+            -e QCOM_GLINK \
+            -e QCOM_GLINK_SSR \
+            -e QTI_PMIC_GLINK \
             -e QTI_BATTERY_CHARGER \
             -e SND_SOC_CS35L41 \
             -e SND_SOC_CS35L41_I2C \
