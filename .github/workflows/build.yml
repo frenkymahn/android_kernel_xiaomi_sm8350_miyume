@@ -51,14 +51,18 @@ jobs:
             -e SND_SOC_CS35L41_I2C \
             -d SENSORS_QTI_AMOLED_ECM \
             -d QCOM_FSA4480_I2C \
-            -d BUILD_ARM64_APPENDED_DTB_IMAGE
+            -d BUILD_ARM64_APPENDED_DTB_IMAGE \
+            -d QCOM_MINIDUMP \
+            -d MSM_MINIDUMP
           sed -i 's/=m$/=y/g' out/.config
           ./scripts/config --file out/.config \
             -d MACH_XIAOMI_VENUS \
             -d BQ_FG_1S \
             -d SENSORS_QTI_AMOLED_ECM \
             -d QCOM_FSA4480_I2C \
-            -d BUILD_ARM64_APPENDED_DTB_IMAGE
+            -d BUILD_ARM64_APPENDED_DTB_IMAGE \
+            -d QCOM_MINIDUMP \
+            -d MSM_MINIDUMP
           make O=out ARCH=arm64 olddefconfig
 
       - name: Compile Pure Image
