@@ -31,7 +31,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y bc bison build-essential ccache curl flex git gnupg gperf imagemagick lib32ncurses5-dev lib32readline-dev lib32z1-dev liblz4-tool libncurses5 libncurses5-dev libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzop pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev clang lld llvm python3 python-is-python3 cpio
 
-      - name: Configure Kernel (QGKI + Vili + Panic Fixes)
+      - name: Configure Kernel (All Built-in + Vili + Panic Fixes)
         run: |
           rm -rf out
           mkdir -p out
@@ -46,20 +46,16 @@ jobs:
             -e MACH_XIAOMI_VILI \
             -d MACH_XIAOMI_VENUS \
             -d BQ_FG_1S \
-            -e QCOM_SCM \
-            -e HH_RM_DRV \
-            -e QCOM_RPMH \
-            -e QCOM_RPMHPD \
-            -e QCOM_SMEM \
-            -e QCOM_MINIDUMP \
-            -e MSM_MINIDUMP \
-            -e QCOM_MEMORY_DUMP_V2 \
-            -e QCOM_GLINK \
-            -e QCOM_GLINK_SSR \
-            -e QTI_PMIC_GLINK \
             -e QTI_BATTERY_CHARGER \
             -e SND_SOC_CS35L41 \
             -e SND_SOC_CS35L41_I2C \
+            -d SENSORS_QTI_AMOLED_ECM \
+            -d QCOM_FSA4480_I2C \
+            -d BUILD_ARM64_APPENDED_DTB_IMAGE
+          sed -i 's/=m$/=y/g' out/.config
+          ./scripts/config --file out/.config \
+            -d MACH_XIAOMI_VENUS \
+            -d BQ_FG_1S \
             -d SENSORS_QTI_AMOLED_ECM \
             -d QCOM_FSA4480_I2C \
             -d BUILD_ARM64_APPENDED_DTB_IMAGE
